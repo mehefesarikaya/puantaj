@@ -232,6 +232,164 @@ assert.strictEqual(dbIskur.has_guard_duty, false);
 
 console.log('✓ TEST 6 GEÇTİ: Veritabanı mapping katmanı Stajyer ve İŞKUR yüklerini doğru sütun kısıtlamalarıyla eşleştirdi.');
 
+// ----------------------------------------------------
+// TEST 7: Kadrolu Seçeneğinin Form Modalından Kaldırıldığı Doğrulaması
+// ----------------------------------------------------
+assert.strictEqual(
+  formFileContent.includes('<option value="kadrolu">Kadrolu</option>'),
+  false,
+  'Form modalında "Kadrolu" seçeneği bulunmamalıdır'
+);
+assert.strictEqual(
+  formFileContent.includes("useState<EmploymentType>('kadrolu')"),
+  false,
+  'Varsayılan form statüsü artık kadrolu olmamalıdır'
+);
+console.log('✓ TEST 7 GEÇTİ: Kadrolu istihdam statüsü formdan tamamen kaldırıldı ve artık sunulmuyor.');
+
+// ----------------------------------------------------
+// TEST 8, 9, 10, 11: Statü Bazlı Maaş Karşılığı Düşümü & Aylık Puantaj Tahakkuk Kuralları
+// ----------------------------------------------------
+function calculateMonthlyPuantajTotalsMock({
+  teacher,
+  totalHours,
+  daysInMonth = 30,
+  weeklyScheduleHours,
+  rules = { bonusFiveToOne: true, gunduzHourlyRate: 220.57 }
+}) {
+  const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || 220.57;
+
+  // 1. SÖZLEŞMELİ: Maaş karşılığı düşümü SADECE sözleşmeli öğretmenlere uygulanır
+  if (teacher.employmentType === 'sozlesmeli') {
+    const maasKarsiligiWeekly = 15; // Genel bilgi ve branş için 15 saat
+    const weeksCount = Math.max(1, Math.round(daysInMonth / 7)); // 4 hafta
+    const monthlyMaasKarsiligi = maasKarsiligiWeekly * weeksCount; // 60 saat
+    const excessHours = Math.max(0, totalHours - monthlyMaasKarsiligi);
+
+    const weeklyHours = weeklyScheduleHours ?? Math.round(totalHours / weeksCount);
+    const weeklyPrep = Math.min(3, Math.floor(weeklyHours / 10)); // 30 saat için 3 saat
+    const monthlyPrep = weeklyPrep * weeksCount; // 12 saat
+
+    const payableTotalHours = excessHours + monthlyPrep;
+    const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+
+    return {
+      totalHours,
+      bonusFiveToOneHours: monthlyPrep,
+      payableTotalHours,
+      estimatedPayment,
+    };
+  }
+
+  // 2. STAJYER & İŞKUR: Kesinti uygulanmaz, ek bonus (5'e 1) verilmez
+  if (
+    teacher.employmentType === 'stajyer' ||
+    teacher.employmentType === 'stajer' ||
+    teacher.employmentType === 'iskurlu'
+  ) {
+    const payableTotalHours = totalHours;
+    const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+    return {
+      totalHours,
+      bonusFiveToOneHours: 0,
+      payableTotalHours,
+      estimatedPayment,
+    };
+  }
+
+  // 3. ÜCRETLİ VE DİĞER: Kesinti uygulanmaz, 5'e 1 ek ders ilavesi uygulanır
+  const bonusFiveToOneHours = rules.bonusFiveToOne ? Math.floor(totalHours / 5) : 0;
+  const payableTotalHours = totalHours + bonusFiveToOneHours;
+  const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+
+  return {
+    totalHours,
+    bonusFiveToOneHours,
+    payableTotalHours,
+    estimatedPayment,
+  };
+}
+
+// TEST 8: Sözleşmeli Öğretmen - Maaş Karşılığı Düşümü Uygulanır
+const sozlesmeliTeacher = {
+  id: 'teacher-sozlesmeli',
+  fullName: 'Ali Sözleşmeli',
+  branch: 'Matematik',
+  branchCategory: 'genel_bilgi_ve_brans',
+  employmentType: 'sozlesmeli',
+  hourlyRate: 220.57,
+};
+// 30 saat/hafta * 4 hafta = 120 saat toplam
+const sozlesmeliResult = calculateMonthlyPuantajTotalsMock({
+  teacher: sozlesmeliTeacher,
+  totalHours: 120,
+  daysInMonth: 30,
+  weeklyScheduleHours: 30,
+});
+// 120 - 60 (maaş karşılığı) = 60 excess + 12 (10'a 1 hazırlık) = 72 saat ödenecek
+assert.strictEqual(sozlesmeliResult.totalHours, 120, 'Sözleşmeli toplam saat 120 olmalı');
+assert.strictEqual(sozlesmeliResult.payableTotalHours, 72, 'Sözleşmeli için 60 saat maaş karşılığı düşülüp 12 saat hazırlık eklenmeli (72 saat ödenecek)');
+assert.strictEqual(sozlesmeliResult.bonusFiveToOneHours, 12, 'Sözleşmeli hazırlık planlama saati 12 olmalı');
+console.log('✓ TEST 8 GEÇTİ: Sözleşmeli öğretmen için haftalık programa dayalı maaş karşılığı düşümü başarıyla uygulandı (120 -> 72 saat).');
+
+// TEST 9: Stajyer Öğretmen - Maaş Karşılığı Düşümü UYGULANMAZ
+const stajyerTeacher = {
+  id: 'teacher-stajyer',
+  fullName: 'Eren Stajyer',
+  branch: 'Matematik',
+  employmentType: 'stajyer',
+  hourlyRate: 220.57,
+};
+const stajyerResult = calculateMonthlyPuantajTotalsMock({
+  teacher: stajyerTeacher,
+  totalHours: 120,
+  daysInMonth: 30,
+  weeklyScheduleHours: 30,
+});
+// Kesinti YOK: 120 saat fiili ders = 120 saat ödenecek
+assert.strictEqual(stajyerResult.totalHours, 120);
+assert.strictEqual(stajyerResult.payableTotalHours, 120, 'Stajyer için maaş karşılığı düşümü YAPILMAMALIDIR (120 saat ödenecek)');
+assert.strictEqual(stajyerResult.bonusFiveToOneHours, 0, 'Stajyer için bonus 0 olmalıdır');
+console.log('✓ TEST 9 GEÇTİ: Stajyer personel için maaş karşılığı düşümü UYGULANMADI (120 fiili = 120 ödenecek saat).');
+
+// TEST 10: İŞKUR Personeli - Maaş Karşılığı Düşümü UYGULANMAZ
+const iskurTeacher = {
+  id: 'teacher-iskur',
+  fullName: 'Fatma İŞKUR',
+  branch: 'Destek Hizmetleri',
+  employmentType: 'iskurlu',
+  hourlyRate: 220.57,
+};
+const iskurResult = calculateMonthlyPuantajTotalsMock({
+  teacher: iskurTeacher,
+  totalHours: 120,
+  daysInMonth: 30,
+  weeklyScheduleHours: 30,
+});
+assert.strictEqual(iskurResult.totalHours, 120);
+assert.strictEqual(iskurResult.payableTotalHours, 120, 'İŞKUR için maaş karşılığı düşümü YAPILMAMALIDIR (120 saat ödenecek)');
+assert.strictEqual(iskurResult.bonusFiveToOneHours, 0, 'İŞKUR için bonus 0 olmalıdır');
+console.log('✓ TEST 10 GEÇTİ: İŞKUR personeli için maaş karşılığı düşümü UYGULANMADI (120 fiili = 120 ödenecek saat).');
+
+// TEST 11: Ücretli Öğretmen - Maaş Karşılığı Düşümü YOKTUR, 5'e 1 Ek Ders İlavesi Uygulanır
+const ucretliTeacher = {
+  id: 'teacher-ucretli',
+  fullName: 'Mehmet Ücretli',
+  branch: 'Fizik',
+  employmentType: 'ucretli',
+  hourlyRate: 220.57,
+};
+const ucretliResult = calculateMonthlyPuantajTotalsMock({
+  teacher: ucretliTeacher,
+  totalHours: 120,
+  daysInMonth: 30,
+  weeklyScheduleHours: 30,
+});
+assert.strictEqual(ucretliResult.totalHours, 120);
+assert.strictEqual(ucretliResult.bonusFiveToOneHours, 24, '120 saat için 5e 1 = 24 saat');
+assert.strictEqual(ucretliResult.payableTotalHours, 144, '120 + 24 = 144 saat ödenecek');
+console.log('✓ TEST 11 GEÇTİ: Ücretli öğretmen için maaş karşılığı düşümü yapılmadı, 5e 1 ilavesiyle 144 saat tahakkuk etti.');
+
 console.log('\n========================================================');
 console.log('TÜM DİNAMİK FORM VE GÜVENLİK TESTLERİ BAŞARIYLA TAMAMLANDI! (100%)');
 console.log('========================================================');

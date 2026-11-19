@@ -7,6 +7,7 @@ import {
   TeacherWeeklySchedule,
 } from '../types';
 import { BRANCH_CATEGORY_CONFIGS, inferBranchCategory } from './branchData';
+import { distributeWeeklyHoursAccordingToMebArticle23 } from './schedulePuantajSync';
 
 /**
  * Öğretmenin eğitim düzeyine (Lisans, Yüksek Lisans, Doktora) ve ders türüne göre
@@ -82,29 +83,44 @@ export function calculateWeeklyAdditionalTeaching(
   weeklyAdditionalHours: number;
   weeklyMaxLimit: number;
   isWeeklyLimitExceeded: boolean;
+  article23WeeklyHours?: number;
+  article23Distribution?: Record<number, number>;
 } {
   // 1. Haftalık planlanan toplam ders saati
   const weeklyScheduledHours = weeklySchedule?.totalWeeklyHours ?? (teacher.hourlyRate ? 30 : 0);
 
-  // 2. Branş kategorisi ve maaş karşılığı
+  // 2. Branş kategorisi ve maaş karşılığı (Yalnızca Sözleşmeli statüde uygulanır)
+  const isSozlesmeli = teacher.employmentType === 'sozlesmeli';
   const category: BranchCategory =
     teacher.branchCategory || inferBranchCategory(teacher.branch);
   const config = BRANCH_CATEGORY_CONFIGS[category] || BRANCH_CATEGORY_CONFIGS.genel_bilgi_ve_brans;
 
-  const maasKarsiligiHours = config.maasKarsiligiHours;
+  // Maaş karşılığı düşümü KURAL: SADECE sözleşmeli statüde uygulanır.
+  // Stajyer, İŞKUR ve diğer statülerde maaş karşılığı düşümü yapılmaz (0).
+  const maasKarsiligiHours = isSozlesmeli ? config.maasKarsiligiHours : 0;
 
   // 3. Maaş karşılığı üstü ders saati
   const excessLessonHours = Math.max(0, weeklyScheduledHours - maasKarsiligiHours);
 
-  // 4. Hazırlık ve Planlama (Genel bilgi ve branş için her 10 saate +1 saat, maks 3; diğerlerinde sabit)
+  // 4. Hazırlık ve Planlama (Sözleşmeli: 10'a 1 veya sabit; Ücretli: 5'e 1; Stajyer/İŞKUR: 0)
   let preparationPlanningHours = 0;
-  if (config.hazirlikPerTenHours) {
-    preparationPlanningHours = Math.min(
-      config.maxHazirlikHours,
-      Math.floor(weeklyScheduledHours / 10)
-    );
+  if (isSozlesmeli) {
+    if (config.hazirlikPerTenHours) {
+      preparationPlanningHours = Math.min(
+        config.maxHazirlikHours,
+        Math.floor(weeklyScheduledHours / 10)
+      );
+    } else {
+      preparationPlanningHours = config.hazirlikFixedHours || 1;
+    }
+  } else if (
+    teacher.employmentType === 'stajyer' ||
+    teacher.employmentType === 'stajer' ||
+    teacher.employmentType === 'iskurlu'
+  ) {
+    preparationPlanningHours = 0;
   } else {
-    preparationPlanningHours = config.hazirlikFixedHours || 1;
+    preparationPlanningHours = rules.bonusFiveToOne ? Math.floor(weeklyScheduledHours / 5) : 0;
   }
 
   // 5. Nöbet Görevi (Haftada 3 saat)
@@ -123,6 +139,12 @@ export function calculateWeeklyAdditionalTeaching(
   const weeklyMaxLimit = config.maxWeeklyAdditionalHours + classGuidanceHours;
   const isWeeklyLimitExceeded = weeklyAdditionalHours > weeklyMaxLimit;
 
+  // 9. MEB Kararı Madde 23 Kapsamındaki Ek Derslerin Çalışma Günlerine Dağıtımı
+  // Hazırlık ve planlama (Madde 11) ile sınıf rehberliği (Madde 6) ek ders saatleri
+  // çalışma günlerine eşit dağıtılır; eşit bölünemeyen saatler öncelikle Pazartesi ve Cuma günlerine eklenir.
+  const article23WeeklyHours = preparationPlanningHours + classGuidanceHours;
+  const article23Distribution = distributeWeeklyHoursAccordingToMebArticle23(article23WeeklyHours);
+
   return {
     weeklyScheduledHours,
     maasKarsiligiHours,
@@ -133,6 +155,8 @@ export function calculateWeeklyAdditionalTeaching(
     weeklyAdditionalHours,
     weeklyMaxLimit,
     isWeeklyLimitExceeded,
+    article23WeeklyHours,
+    article23Distribution,
   };
 }
 
@@ -211,5 +235,86 @@ export function calculateMonthlyTeacherPayment(
     stampTaxAmount,
     totalDeductions,
     netPayment,
+  };
+}
+
+export interface MonthlyPuantajTotals {
+  totalHours: number;
+  bonusFiveToOneHours: number;
+  payableTotalHours: number;
+  estimatedPayment: number;
+}
+
+/**
+ * Aylık puantaj cetveli için toplam saat, 5'e 1 / hazırlık ve ödenecek toplam saati hesaplar.
+ *
+ * RESMİ MEB KURALLARI:
+ * 1. Sözleşmeli: Haftalık programa göre maaş karşılığı düşümü uygulanır.
+ *    Ödenecek Saat = (Toplam Fiili Saat - Aylık Maaş Karşılığı) + Hazırlık/Planlama
+ * 2. Stajyer: Maaş karşılığı düşümü YOKTUR, 5'e 1 ilavesi YOKTUR. Ödenecek = Fiili Saat.
+ * 3. İŞKUR: Maaş karşılığı düşümü YOKTUR, 5'e 1 ilavesi YOKTUR. Ödenecek = Fiili Saat.
+ * 4. Ücretli ve Diğer: Maaş karşılığı düşümü YOKTUR, 5'e 1 ek ders ilavesi uygulanır.
+ */
+export function calculateMonthlyPuantajTotals(params: {
+  teacher: Teacher;
+  totalHours: number;
+  daysInMonth: number;
+  weeklyScheduleHours?: number;
+  rules: MebPaymentRules;
+}): MonthlyPuantajTotals {
+  const { teacher, totalHours, daysInMonth, weeklyScheduleHours, rules } = params;
+  const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
+
+  // 1. SÖZLEŞMELİ: Maaş karşılığı düşümü SADECE sözleşmeli öğretmenlere uygulanır
+  if (teacher.employmentType === 'sozlesmeli') {
+    const category = teacher.branchCategory || inferBranchCategory(teacher.branch);
+    const config = BRANCH_CATEGORY_CONFIGS[category] || BRANCH_CATEGORY_CONFIGS.genel_bilgi_ve_brans;
+    const weeksCount = Math.max(1, Math.round(daysInMonth / 7));
+    const monthlyMaasKarsiligi = config.maasKarsiligiHours * weeksCount;
+    const excessHours = Math.max(0, totalHours - monthlyMaasKarsiligi);
+
+    const weeklyHours = weeklyScheduleHours ?? (weeksCount > 0 ? Math.round(totalHours / weeksCount) : 30);
+    const weeklyPrep = config.hazirlikPerTenHours
+      ? Math.min(config.maxHazirlikHours, Math.floor(weeklyHours / 10))
+      : (config.hazirlikFixedHours || 1);
+    const monthlyPrep = weeklyPrep * weeksCount;
+
+    const payableTotalHours = excessHours + monthlyPrep;
+    const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+
+    return {
+      totalHours,
+      bonusFiveToOneHours: monthlyPrep,
+      payableTotalHours,
+      estimatedPayment,
+    };
+  }
+
+  // 2. STAJYER & İŞKUR: Kesinti uygulanmaz, ek bonus (5'e 1) verilmez
+  if (
+    teacher.employmentType === 'stajyer' ||
+    teacher.employmentType === 'stajer' ||
+    teacher.employmentType === 'iskurlu'
+  ) {
+    const payableTotalHours = totalHours;
+    const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+    return {
+      totalHours,
+      bonusFiveToOneHours: 0,
+      payableTotalHours,
+      estimatedPayment,
+    };
+  }
+
+  // 3. ÜCRETLİ VE DİĞER: Kesinti uygulanmaz, 5'e 1 ek ders ilavesi uygulanır
+  const bonusFiveToOneHours = rules.bonusFiveToOne ? Math.floor(totalHours / 5) : 0;
+  const payableTotalHours = totalHours + bonusFiveToOneHours;
+  const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+
+  return {
+    totalHours,
+    bonusFiveToOneHours,
+    payableTotalHours,
+    estimatedPayment,
   };
 }

@@ -38,7 +38,7 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
   const [branch, setBranch] = useState('Matematik');
   const [branchCategory, setBranchCategory] = useState<BranchCategory>('genel_bilgi_ve_brans');
   const [educationLevel, setEducationLevel] = useState<EducationLevel>('lisans');
-  const [employmentType, setEmploymentType] = useState<EmploymentType>('kadrolu');
+  const [employmentType, setEmploymentType] = useState<EmploymentType>('sozlesmeli');
   const [hasGuardDuty, setHasGuardDuty] = useState(false);
   const [guardDutyDay, setGuardDutyDay] = useState<number>(0);
   const [hasClassGuidance, setHasClassGuidance] = useState(false);
@@ -69,7 +69,10 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
         initialTeacher.branchCategory || inferBranchCategory(initialTeacher.branch)
       );
       setEducationLevel(initialTeacher.educationLevel || 'lisans');
-      setEmploymentType(initialTeacher.employmentType || 'sozlesmeli');
+      const initialEmployment = initialTeacher.employmentType === 'kadrolu'
+        ? 'sozlesmeli'
+        : (initialTeacher.employmentType || 'sozlesmeli');
+      setEmploymentType(initialEmployment);
       setHasGuardDuty(Boolean(initialTeacher.hasGuardDuty));
       setGuardDutyDay(initialTeacher.guardDutyDay || 0);
       setHasClassGuidance(Boolean(initialTeacher.hasClassGuidance));
@@ -524,7 +527,6 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
                 onChange={(e) => handleEmploymentTypeChange(e.target.value as EmploymentType)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
-                <option value="kadrolu">Kadrolu</option>
                 <option value="sozlesmeli">Sözleşmeli</option>
                 <option value="ucretli">Ücretli</option>
                 <option value="stajyer">Stajyer</option>

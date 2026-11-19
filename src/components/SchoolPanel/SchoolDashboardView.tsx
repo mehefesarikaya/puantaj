@@ -16,12 +16,16 @@ import {
 import { useApp } from '../../context/AppContext';
 import { MONTH_NAMES_TR } from '../../utils/excelPuantajUtils';
 import { formatTRY } from '../../utils/paymentCalculator';
+import { calculateMonthlyPuantajTotals } from '../../utils/additionalTeachingCalculator';
+import { syncTeacherScheduleToMonth } from '../../utils/schedulePuantajSync';
 
 export const SchoolDashboardView: React.FC = () => {
   const {
     schools,
     teachers,
     puantajRows,
+    weeklySchedules,
+    rules,
     submissions,
     selectedYear,
     selectedMonth,
@@ -238,10 +242,19 @@ export const SchoolDashboardView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
               {schoolTeachers.map((teacher) => {
                 const row = schoolPuantaj.find((p) => p.teacherId === teacher.id);
-                const actual = row ? row.totalHours : 0;
-                const bonus = row ? row.bonusFiveToOneHours : Math.floor(actual / 5);
-                const payable = row ? row.payableTotalHours : actual + bonus;
-                const amount = row ? row.estimatedPayment : payable * teacher.hourlyRate;
+                const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+                const effectiveRow = row || (schedule ? syncTeacherScheduleToMonth({
+                  teacher,
+                  schedule,
+                  year: selectedYear,
+                  month: selectedMonth,
+                  rules,
+                }).updatedRow : null);
+
+                const actual = effectiveRow ? effectiveRow.totalHours : 0;
+                const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
+                const payable = effectiveRow ? effectiveRow.payableTotalHours : actual;
+                const amount = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
 
                 return (
                   <tr key={teacher.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">

@@ -6,12 +6,93 @@ import {
   MebPaymentRules,
   SchoolMonthlySubmission,
 } from '../types';
+import { calculateMonthlyPuantajTotals } from './additionalTeachingCalculator';
 
 /**
  * Ayın kaç gün çektiğini döner (28, 29, 30 veya 31)
  */
 export function getDaysInMonthCount(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
+}
+
+export interface OfficialHolidayInfo {
+  isHoliday: boolean;
+  name: string;
+  isHalfDay?: boolean; // 28 Ekim gibi yarım gün tatiller
+}
+
+/**
+ * Resmî Tatil Takvimi Bilgisi (MEB Çalışma Takvimi & 2429 Sayılı Kanun)
+ *
+ * - 1 Ocak: Yılbaşı (Tam gün)
+ * - 23 Nisan: Ulusal Egemenlik ve Çocuk Bayramı (Tam gün)
+ * - 1 Mayıs: Emek ve Dayanışma Günü (Tam gün)
+ * - 19 Mayıs: Atatürk'ü Anma, Gençlik ve Spor Bayramı (Tam gün)
+ * - 15 Temmuz: Demokrasi ve Millî Birlik Günü (Tam gün)
+ * - 30 Ağustos: Zafer Bayramı (Tam gün)
+ * - 28 Ekim: Cumhuriyet Bayramı Arefesi (Yarım gün tatil - 13:00'ten sonra)
+ * - 29 Ekim: Cumhuriyet Bayramı (Tam gün)
+ */
+export function getOfficialHolidayInfo(year: number, month: number, day: number): OfficialHolidayInfo {
+  if (month === 1 && day === 1) {
+    return { isHoliday: true, name: 'Yılbaşı' };
+  }
+  if (month === 4 && day === 23) {
+    return { isHoliday: true, name: '23 Nisan Ulusal Egemenlik ve Çocuk Bayramı' };
+  }
+  if (month === 5 && day === 1) {
+    return { isHoliday: true, name: '1 Mayıs Emek ve Dayanışma Günü' };
+  }
+  if (month === 5 && day === 19) {
+    return { isHoliday: true, name: "19 Mayıs Atatürk'ü Anma, Gençlik ve Spor Bayramı" };
+  }
+  if (month === 7 && day === 15) {
+    return { isHoliday: true, name: '15 Temmuz Demokrasi ve Millî Birlik Günü' };
+  }
+  if (month === 8 && day === 30) {
+    return { isHoliday: true, name: '30 Ağustos Zafer Bayramı' };
+  }
+  if (month === 10 && day === 28) {
+    return { isHoliday: true, name: '28 Ekim Cumhuriyet Bayramı Arefesi', isHalfDay: true };
+  }
+  if (month === 10 && day === 29) {
+    return { isHoliday: true, name: '29 Ekim Cumhuriyet Bayramı' };
+  }
+
+  return { isHoliday: false, name: '' };
+}
+
+/**
+ * MEB Ek Ders Kararı Madde 23 Dağıtım Kuralı:
+ *
+ * "Bu Kararın 10, 14 ve 21 inci maddelerindeki ek ders saatleri...
+ * haftanın çalışma günlerine eşit olarak dağıtılır. Eşit dağıtılamayan saatler
+ * öncelikle Pazartesi ve Cuma günlerine eklenir."
+ *
+ * @param totalHours Haftalık dağıtılacak ek ders saati (Hazırlık/Planlama, Rehberlik vb.)
+ * @returns Record<number, number> Günlere göre (1: Pzt, 2: Sal, 3: Çar, 4: Per, 5: Cum) saat dağılımı
+ */
+export function distributeWeeklyHoursAccordingToMebArticle23(totalHours: number): Record<number, number> {
+  const result: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  if (!totalHours || totalHours <= 0) return result;
+
+  // 1. Çalışma günlerine (5 iş günü) eşit taban dağıtım
+  const basePerDay = Math.floor(totalHours / 5);
+  for (let d = 1; d <= 5; d++) {
+    result[d] = basePerDay;
+  }
+
+  // 2. Eşit dağıtılamayan kalan saatler (öncelikle Pazartesi ve Cuma)
+  const remainder = totalHours % 5;
+  if (remainder === 0) return result;
+
+  const priorityOrder = [1, 5, 3, 2, 4];
+  for (let i = 0; i < remainder; i++) {
+    const day = priorityOrder[i];
+    result[day] += 1;
+  }
+
+  return result;
 }
 
 /**
@@ -57,12 +138,25 @@ export function getPlannedHoursForDate(
     return 0;
   }
 
-  // 3. Haftanın Günü Eşleşmesi (Pzt=1, Sal=2, Çar=3, Per=4, Cum=5, Cmt=6, Paz=7)
+  // 3. Resmî Tatil Kontrolü
+  const holiday = getOfficialHolidayInfo(year, month, day);
+  if (holiday.isHoliday && !holiday.isHalfDay) {
+    return 0; // Tam gün resmî tatilde fiili ders yapılmaz
+  }
+
+  // 4. Haftanın Günü Eşleşmesi (Pzt=1, Sal=2, Çar=3, Per=4, Cum=5, Cmt=6, Paz=7)
   const dateObj = new Date(year, month - 1, day);
   const dow = getScheduleDayOfWeek(dateObj.getDay());
 
   const dayLessons = schedule.lessons.filter((l) => l.dayOfWeek === dow);
-  return dayLessons.reduce((sum, l) => sum + (Number(l.lessonCount) || 0), 0);
+  const totalDayLessons = dayLessons.reduce((sum, l) => sum + (Number(l.lessonCount) || 0), 0);
+
+  // Yarım gün resmî tatilde (örn. 28 Ekim) öğleden önce yapılan dersler verilir
+  if (holiday.isHoliday && holiday.isHalfDay) {
+    return Math.ceil(totalDayLessons / 2);
+  }
+
+  return totalDayLessons;
 }
 
 /**
@@ -147,7 +241,10 @@ export function syncTeacherDutyHours(params: {
       (teacher.startDate && dateStr < teacher.startDate) ||
       (teacher.departureDate && dateStr > teacher.departureDate);
 
-    if (hasDuty && dow === dutyDay && !isOutsidePeriod && !isOutsideTeacherActive) {
+    const holiday = getOfficialHolidayInfo(year, month, day);
+    const isFullHoliday = holiday.isHoliday && !holiday.isHalfDay;
+
+    if (hasDuty && dow === dutyDay && !isOutsidePeriod && !isOutsideTeacherActive && !isFullHoliday) {
       dutyDailyHours[day] = 3;
       dutyDailyStatuses[day] = 'planned';
     } else {
@@ -230,8 +327,7 @@ export function syncTeacherScheduleToMonth(params: {
       status === 'confirmed' ||
       status === 'manual' ||
       status === 'izinli' ||
-      status === 'raporlu' ||
-      status === 'tatil';
+      status === 'raporlu';
 
     if (isProtected) {
       continue;
@@ -247,6 +343,17 @@ export function syncTeacherScheduleToMonth(params: {
       if (currentStatuses[day] === 'planned') {
         currentDailyHours[day] = null;
         delete currentStatuses[day];
+        modifiedDaysCount++;
+      }
+      continue;
+    }
+
+    // Resmî Tatil Kontrolü
+    const holiday = getOfficialHolidayInfo(year, month, day);
+    if (holiday.isHoliday && !holiday.isHalfDay) {
+      if (currentDailyHours[day] !== null || currentStatuses[day] !== 'tatil') {
+        currentDailyHours[day] = null;
+        currentStatuses[day] = 'tatil';
         modifiedDaysCount++;
       }
       continue;
@@ -271,15 +378,22 @@ export function syncTeacherScheduleToMonth(params: {
     }
   }
 
-  // Toplam ders saati, 5'e 1 ve tahakkuk hesabı
+  // Toplam ders saati, statü bazlı maaş karşılığı / 5'e 1 ve tahakkuk hesabı
   const totalHours = Object.values(currentDailyHours).reduce(
     (sum: number, h) => sum + (h || 0),
     0
   );
-  const bonusFiveToOneHours = rules.bonusFiveToOne ? Math.floor(totalHours / 5) : 0;
-  const payableTotalHours = totalHours + bonusFiveToOneHours;
+  const totals = calculateMonthlyPuantajTotals({
+    teacher,
+    totalHours,
+    daysInMonth,
+    weeklyScheduleHours: schedule?.totalWeeklyHours,
+    rules,
+  });
+  const bonusFiveToOneHours = totals.bonusFiveToOneHours;
+  const payableTotalHours = totals.payableTotalHours;
   const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
-  const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
+  const estimatedPayment = totals.estimatedPayment;
 
   // Nöbet görevi saatlerini senkronize et
   const dutyResult = syncTeacherDutyHours({

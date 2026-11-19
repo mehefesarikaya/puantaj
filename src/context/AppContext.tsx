@@ -37,7 +37,9 @@ import { runSecurityAuditTests, SecurityTestReport } from '../services/securityT
 import {
   syncTeacherScheduleToMonth,
   confirmPlannedDaysInRow,
+  getDaysInMonthCount,
 } from '../utils/schedulePuantajSync';
+import { calculateMonthlyPuantajTotals } from '../utils/additionalTeachingCalculator';
 
 interface AppContextType {
   // Data
@@ -377,6 +379,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initAuthSession();
   }, [isSupabaseActive]);
+
+  // Selected Year & Month Change: Fetch remote puantaj rows from Supabase
+  useEffect(() => {
+    if (!isSupabaseActive || !currentUser) return;
+
+    let isMounted = true;
+    const fetchMonthlyPuantaj = async () => {
+      try {
+        const remoteRows = await supabaseDataService.fetchPuantajRows(selectedYear, selectedMonth);
+        if (!isMounted) return;
+
+        if (remoteRows && remoteRows.length > 0) {
+          setPuantajRows((prev) => {
+            const otherMonths = prev.filter(
+              (p) => !(p.year === selectedYear && p.month === selectedMonth)
+            );
+            return [...otherMonths, ...remoteRows];
+          });
+        }
+      } catch (err) {
+        console.warn('Aylık puantaj verisi çekilemedi:', err);
+      }
+    };
+
+    fetchMonthlyPuantaj();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedYear, selectedMonth, isSupabaseActive, currentUser]);
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
   const toggleMaskSensitiveData = () => setMaskSensitiveData((prev) => !prev);
@@ -764,6 +795,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     let updatedRow: TeacherMonthlyPuantajRow | null = null;
+    const daysInMonth = getDaysInMonthCount(year, month);
+    const schedule = weeklySchedules.find((s) => s.teacherId === teacherId);
 
     setPuantajRows((prev) => {
       const idx = prev.findIndex(
@@ -784,17 +817,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           (acc: number, val) => acc + (val || 0),
           0
         );
-        const newBonus = rules.bonusFiveToOne ? Math.floor(newTotal / 5) : 0;
-        const newPayable = newTotal + newBonus;
+        const totals = calculateMonthlyPuantajTotals({
+          teacher,
+          totalHours: newTotal,
+          daysInMonth,
+          weeklyScheduleHours: schedule?.totalWeeklyHours,
+          rules,
+        });
 
         updatedRow = {
           ...existing,
           dailyHours: newDaily,
           dailyStatuses: newStatuses,
           totalHours: newTotal,
-          bonusFiveToOneHours: newBonus,
-          payableTotalHours: newPayable,
-          estimatedPayment: newPayable * (teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate),
+          bonusFiveToOneHours: totals.bonusFiveToOneHours,
+          payableTotalHours: totals.payableTotalHours,
+          estimatedPayment: totals.estimatedPayment,
         };
 
         const copy = [...prev];
@@ -804,8 +842,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const newDaily: Record<number, number | null> = { [day]: hours };
         const newStatuses = hours !== null ? { [day]: 'confirmed' as const } : {};
         const newTotal = hours || 0;
-        const newBonus = rules.bonusFiveToOne ? Math.floor(newTotal / 5) : 0;
-        const newPayable = newTotal + newBonus;
+        const totals = calculateMonthlyPuantajTotals({
+          teacher,
+          totalHours: newTotal,
+          daysInMonth,
+          weeklyScheduleHours: schedule?.totalWeeklyHours,
+          rules,
+        });
 
         updatedRow = {
           teacherId,
@@ -815,9 +858,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           dailyHours: newDaily,
           dailyStatuses: newStatuses,
           totalHours: newTotal,
-          bonusFiveToOneHours: newBonus,
-          payableTotalHours: newPayable,
-          estimatedPayment: newPayable * (teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate),
+          bonusFiveToOneHours: totals.bonusFiveToOneHours,
+          payableTotalHours: totals.payableTotalHours,
+          estimatedPayment: totals.estimatedPayment,
         };
         return [...prev, updatedRow];
       }
@@ -1171,8 +1214,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const total = Object.values(item.dailyHours).reduce((acc: number, val) => acc + (val || 0), 0);
-      const bonus = rules.bonusFiveToOne ? Math.floor(total / 5) : 0;
-      const payable = total + bonus;
+      const totals = calculateMonthlyPuantajTotals({
+        teacher: teacher!,
+        totalHours: total,
+        daysInMonth: getDaysInMonthCount(year, month),
+        rules,
+      });
 
       const existingIdx = newPuantajList.findIndex(
         (p) => p.teacherId === teacher!.id && p.year === year && p.month === month
@@ -1185,9 +1232,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         month,
         dailyHours: item.dailyHours,
         totalHours: total,
-        bonusFiveToOneHours: bonus,
-        payableTotalHours: payable,
-        estimatedPayment: payable * rules.ucretliHourlyRate,
+        bonusFiveToOneHours: totals.bonusFiveToOneHours,
+        payableTotalHours: totals.payableTotalHours,
+        estimatedPayment: totals.estimatedPayment,
       };
 
       if (existingIdx >= 0) {
@@ -1242,41 +1289,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       const isLocked = sub?.status === 'onaylandi' || sub?.status === 'gonderildi' || sub?.status === 'incelemede';
 
-      let syncedRow: TeacherMonthlyPuantajRow | null = null;
+      const existingRow = puantajRows.find(
+        (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
+      );
+
+      const syncResult = syncTeacherScheduleToMonth({
+        teacher,
+        schedule,
+        year: selectedYear,
+        month: selectedMonth,
+        existingRow,
+        isSubmissionLocked: isLocked,
+        periodStartDate: period.startDate,
+        periodEndDate: period.endDate,
+        rules,
+      });
+
+      const syncedRow = syncResult.updatedRow;
 
       setPuantajRows((prevRows) => {
-        const existingRow = prevRows.find(
-          (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
-        );
-
-        const syncResult = syncTeacherScheduleToMonth({
-          teacher,
-          schedule,
-          year: selectedYear,
-          month: selectedMonth,
-          existingRow,
-          isSubmissionLocked: isLocked,
-          periodStartDate: period.startDate,
-          periodEndDate: period.endDate,
-          rules,
-        });
-
-        syncedRow = syncResult.updatedRow;
-
         const rowIdx = prevRows.findIndex(
           (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
         );
 
         if (rowIdx >= 0) {
           const copy = [...prevRows];
-          copy[rowIdx] = syncResult.updatedRow;
+          copy[rowIdx] = syncedRow;
           return copy;
         }
-        return [...prevRows, syncResult.updatedRow];
+        return [...prevRows, syncedRow];
       });
 
-      if (isSupabaseActive && syncedRow) {
-        supabaseDataService.upsertPuantajRow(syncedRow).catch(console.error);
+      if (isSupabaseActive) {
+        try {
+          await supabaseDataService.upsertPuantajRow(syncedRow);
+        } catch (err) {
+          console.warn('Puantaj satırı Supabase veritabanına kaydedilemedi:', err);
+        }
       }
     }
 

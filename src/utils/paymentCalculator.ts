@@ -1,4 +1,5 @@
 import { MebPaymentRules, Teacher } from '../types';
+import { calculateMonthlyPuantajTotals } from './additionalTeachingCalculator';
 
 export const DEFAULT_MEB_PAYMENT_RULES: MebPaymentRules = {
   ucretliHourlyRate: 140.0,
@@ -41,15 +42,24 @@ export interface TeacherPaymentBreakdown {
 export function calculateTeacherPayment(
   teacher: Teacher,
   actualHours: number,
-  rules: MebPaymentRules
+  rules: MebPaymentRules,
+  options?: { daysInMonth?: number; weeklyScheduleHours?: number }
 ): TeacherPaymentBreakdown {
-  const hourlyRate = teacher.hourlyRate > 0 ? teacher.hourlyRate : rules.ucretliHourlyRate;
+  const hourlyRate = teacher.hourlyRate > 0 ? teacher.hourlyRate : (rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57);
+  const daysInMonth = options?.daysInMonth || 30;
 
-  // MEB rule: 1 bonus hour per 5 completed hours
-  const bonusHours = rules.bonusFiveToOne ? Math.floor(actualHours / 5) : 0;
-  const payableTotalHours = actualHours + bonusHours;
+  // Resmî statü kurallarına göre aylık puantaj toplamları
+  const totals = calculateMonthlyPuantajTotals({
+    teacher,
+    totalHours: actualHours,
+    daysInMonth,
+    weeklyScheduleHours: options?.weeklyScheduleHours,
+    rules,
+  });
 
-  const grossPayment = payableTotalHours * hourlyRate;
+  const bonusHours = totals.bonusFiveToOneHours;
+  const payableTotalHours = totals.payableTotalHours;
+  const grossPayment = totals.estimatedPayment;
 
   // Tax calculations
   const otherEmployerTaxBase = teacher.hasOtherEmployer ? teacher.otherEmployerTaxBase || 0 : 0;

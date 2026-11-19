@@ -238,6 +238,11 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                           Günlük: {dayTotal} Saat
                         </span>
+                        {day.id <= 5 && (calculation.article23Distribution?.[day.id] || 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            +{calculation.article23Distribution?.[day.id]} Saat Madde 23
+                          </span>
+                        )}
                       </div>
 
                       <button
@@ -401,6 +406,25 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
                     {calculation.weeklyAdditionalHours} Saat
                   </span>
                 </div>
+
+                {/* MEB Madde 23 Dağıtım Özeti */}
+                {(calculation.article23WeeklyHours || 0) > 0 && (
+                  <div className="mt-2.5 p-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] space-y-1">
+                    <span className="font-bold text-indigo-900 dark:text-indigo-300 block">
+                      MEB Kararı Madde 23 Dağılımı ({calculation.article23WeeklyHours} Saat):
+                    </span>
+                    <div className="flex items-center justify-between font-mono text-[10px] text-indigo-700 dark:text-indigo-300">
+                      <span>Pzt: +{calculation.article23Distribution?.[1] || 0}</span>
+                      <span>Sal: +{calculation.article23Distribution?.[2] || 0}</span>
+                      <span>Çar: +{calculation.article23Distribution?.[3] || 0}</span>
+                      <span>Per: +{calculation.article23Distribution?.[4] || 0}</span>
+                      <span>Cum: +{calculation.article23Distribution?.[5] || 0}</span>
+                    </div>
+                    <span className="text-[9px] text-indigo-500 dark:text-indigo-400 block italic leading-tight">
+                      * Eşit dağıtılamayan saatler öncelikle Pazartesi ve Cuma günlerine eklenmiştir.
+                    </span>
+                  </div>
+                )}
 
                 {calculation.isWeeklyLimitExceeded && (
                   <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-1.5">

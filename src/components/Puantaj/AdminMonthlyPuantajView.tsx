@@ -27,6 +27,8 @@ import {
   exportMonthlyPuantajToExcel,
 } from '../../utils/excelPuantajUtils';
 import { formatTRY } from '../../utils/paymentCalculator';
+import { calculateMonthlyPuantajTotals } from '../../utils/additionalTeachingCalculator';
+import { syncTeacherScheduleToMonth } from '../../utils/schedulePuantajSync';
 import { AdminPeriodManagerModal } from './AdminPeriodManagerModal';
 import { GENERAL_DIRECTORATES, GeneralDirectorate } from '../../types';
 
@@ -45,6 +47,8 @@ export const AdminMonthlyPuantajView: React.FC = () => {
     schools,
     teachers,
     puantajRows,
+    weeklySchedules,
+    rules,
     selectedYear,
     selectedMonth,
     selectedSchoolId,
@@ -133,24 +137,33 @@ export const AdminMonthlyPuantajView: React.FC = () => {
     const rowData = puantajRows.find(
       (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
     );
-    const daily = rowData ? rowData.dailyHours : {};
-    const statuses = rowData ? rowData.dailyStatuses || {} : {};
-    const total = rowData ? rowData.totalHours : 0;
-    const bonus = rowData ? rowData.bonusFiveToOneHours : Math.floor(total / 5);
-    const payable = rowData ? rowData.payableTotalHours : total + bonus;
-    const payment = rowData ? rowData.estimatedPayment : payable * teacher.hourlyRate;
+    const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+    const effectiveRow = rowData || (schedule ? syncTeacherScheduleToMonth({
+      teacher,
+      schedule,
+      year: selectedYear,
+      month: selectedMonth,
+      rules,
+    }).updatedRow : null);
 
-    const dutyDaily = rowData ? rowData.dutyDailyHours || {} : {};
-    const dutyStatuses = rowData ? rowData.dutyDailyStatuses || {} : {};
-    const dutyTotal = rowData ? (rowData.dutyTotalHours ?? 0) : 0;
-    const dutyPayment = rowData
-      ? (rowData.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
+    const daily = effectiveRow ? effectiveRow.dailyHours : {};
+    const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
+    const total = effectiveRow ? effectiveRow.totalHours : 0;
+    const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
+    const payable = effectiveRow ? effectiveRow.payableTotalHours : total;
+    const payment = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
+
+    const dutyDaily = effectiveRow ? effectiveRow.dutyDailyHours || {} : {};
+    const dutyStatuses = effectiveRow ? effectiveRow.dutyDailyStatuses || {} : {};
+    const dutyTotal = effectiveRow ? (effectiveRow.dutyTotalHours ?? 0) : 0;
+    const dutyPayment = effectiveRow
+      ? (effectiveRow.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
       : (dutyTotal * teacher.hourlyRate);
     const hasDuty = Boolean(teacher.guardDutyDay || dutyTotal > 0 || Object.keys(dutyDaily).length > 0);
 
     return {
       teacher,
-      rowData,
+      rowData: rowData || effectiveRow,
       daily,
       statuses,
       total,
