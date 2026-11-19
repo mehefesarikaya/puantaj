@@ -284,6 +284,8 @@ export function calculateWeeklyDailyMebBreakdown(params: {
 
   const prepDistribution = distributeWeeklyHoursAccordingToMebArticle23(weeklyCalc.preparationPlanningHours);
   const guidanceDistribution = distributeWeeklyHoursAccordingToMebArticle23(weeklyCalc.classGuidanceHours);
+  // MEB Günlük Maaş Karşılığı ve Ek Ders Dağılım Çizelgesindeki toplam ek ders saatini günlere eşit dağıt
+  const equalEkDersDistribution = distributeWeeklyHoursAccordingToMebArticle23(weeklyCalc.weeklyAdditionalHours);
 
   const dayNames: Record<number, string> = {
     1: 'Pazartesi',
@@ -325,7 +327,9 @@ export function calculateWeeklyDailyMebBreakdown(params: {
       teacher.hasGuardDuty && teacher.guardDutyDay === d ? rules.nobetHoursPerWeek || 3 : 0;
 
     const totalDailyAdditionalHours =
-      excessForDay + prepDayHours + guidanceDayHours + dutyDayHours + specialLessons;
+      d >= 1 && d <= 5
+        ? (equalEkDersDistribution[d] || 0)
+        : (specialLessons);
 
     dailyBreakdown[d] = {
       dayOfWeek: d,
