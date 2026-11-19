@@ -26,6 +26,7 @@ import {
   MebPaymentRules,
 } from '../types';
 import { DEFAULT_MEB_PAYMENT_RULES } from '../utils/paymentCalculator';
+import { getStoredBranches } from '../utils/branchData';
 
 export interface MigrationResult {
   success: boolean;
@@ -38,6 +39,7 @@ export interface MigrationResult {
   puantajRowsMigrated: number;
   rulesMigrated: boolean;
   calcRulesMigrated: boolean;
+  branchesMigrated?: number;
   errors: string[];
 }
 
@@ -223,9 +225,28 @@ export const migrateLocalStorageToSupabase = async (): Promise<MigrationResult> 
       result.calcRulesMigrated = true;
     }
 
+    // 9. Branches (Public branches table)
+    const branches = getStoredBranches();
+    if (branches && branches.length > 0) {
+      const branchPayload = branches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        category: b.category,
+        is_custom: Boolean(b.isCustom),
+      }));
+      const { error: branchError } = await supabase
+        .from('branches')
+        .upsert(branchPayload, { onConflict: 'id' });
+      if (branchError) {
+        result.errors.push(`Branş listesi aktarım hatası: ${branchError.message}`);
+      } else {
+        result.branchesMigrated = branches.length;
+      }
+    }
+
     result.success = result.errors.length === 0;
     result.message = result.success
-      ? 'Tüm yerel veriler (Okullar, Öğretmenler, Programlar, Dönemler, Puantajlar, Katsayılar) Supabase veritabanına başarıyla aktarıldı.'
+      ? 'Tüm yerel veriler (Okullar, Öğretmenler, Programlar, Dönemler, Puantajlar, Katsayılar, Branşlar) Supabase veritabanına başarıyla aktarıldı.'
       : 'Veri aktarımı bazı hatalarla tamamlandı.';
 
     return result;

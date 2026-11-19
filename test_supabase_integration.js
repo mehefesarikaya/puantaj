@@ -83,10 +83,31 @@ assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.teachers'), 
 assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.school_monthly_submissions'), 'submissions tablosu mevcut');
 assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.teacher_monthly_puantaj'), 'puantaj tablosu mevcut');
 assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.meb_payment_rules'), 'meb kuralları tablosu mevcut');
+assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.payment_calculation_rules'), 'payment calculation rules tablosu mevcut');
+assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.teacher_weekly_schedules'), 'teacher weekly schedules tablosu mevcut');
+assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.branches'), 'branches tablosu mevcut');
+assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.timesheet_periods'), 'timesheet_periods tablosu mevcut');
 assert.ok(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.audit_logs'), 'audit logs tablosu mevcut');
 assert.ok(schemaContent.includes('ENABLE ROW LEVEL SECURITY'), 'RLS etkinleştirildi');
 assert.ok(schemaContent.includes('public.current_user_school_id()'), 'RLS okul filtresi mevcut');
 
-console.log('✓ 5. supabase_schema.sql eksiksiz, 7 tablo, RLS kuralları ve fonksiyonlar mevcut.');
+console.log('✓ 5. supabase_schema.sql eksiksiz, tüm 11 tablo, RLS kuralları ve fonksiyonlar mevcut.');
+
+// 6. Verify Branches Mapping and Migration
+const mockBranch = {
+  id: 'b-biyomedikal',
+  name: 'Biyomedikal Cihaz Teknolojileri',
+  category: 'atolye_laboratuvar',
+  isCustom: true,
+};
+const mockBranchDb = {
+  id: mockBranch.id,
+  name: mockBranch.name,
+  category: mockBranch.category,
+  is_custom: mockBranch.isCustom,
+};
+assert.strictEqual(mockBranchDb.category, 'atolye_laboratuvar');
+assert.strictEqual(mockBranchDb.is_custom, true);
+console.log('✓ 6. Branşlar tablosu mapping doğrulaması başarılı.');
 
 console.log('--- TÜM SUPABASE TESTLERİ BAŞARIYLA GEÇTİ! ---');

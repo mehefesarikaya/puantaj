@@ -302,6 +302,12 @@ export const AdminSettingsView: React.FC = () => {
                   <span>Aktarılan Günlük Puantaj Satırları:</span>
                   <span className="font-bold">{migrationResult.puantajRowsMigrated}</span>
                 </div>
+                {migrationResult.branchesMigrated !== undefined && (
+                  <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700">
+                    <span>Sistem Branş Listesi:</span>
+                    <span className="font-bold">{migrationResult.branchesMigrated}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1">
                   <span>MEB Mevzuat Parametreleri:</span>
                   <span className="font-bold text-emerald-600">
