@@ -46,6 +46,9 @@ const WeeklyScheduleOverviewView = lazy(() =>
 const AdminPricingRulesView = lazy(() =>
   import('./components/Pricing/AdminPricingRulesView').then((m) => ({ default: m.AdminPricingRulesView }))
 );
+const SchoolSubmissionsView = lazy(() =>
+  import('./components/Submissions/SchoolSubmissionsView').then((m) => ({ default: m.SchoolSubmissionsView }))
+);
 
 export const App: React.FC = () => {
   const { activeTab, currentUser, isAuthChecking } = useApp();
@@ -92,6 +95,8 @@ export const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <AdminDashboardView />;
+      case 'submissions':
+        return <SchoolSubmissionsView />;
       case 'schools':
         return <SchoolListView />;
       case 'teachers':

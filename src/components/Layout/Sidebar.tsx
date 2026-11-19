@@ -15,6 +15,7 @@ import {
   LogOut,
   Calendar,
   Coins,
+  Inbox,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -31,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
 
   const adminMenuItems = [
     { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard },
+    { id: 'submissions', label: 'Okul Teslimatları', icon: Inbox },
     { id: 'schools', label: 'Kurum Yönetimi', icon: Building2 },
     { id: 'teachers', label: 'Öğretmenler', icon: Users },
     { id: 'schedule', label: 'Ders Programları', icon: Calendar },

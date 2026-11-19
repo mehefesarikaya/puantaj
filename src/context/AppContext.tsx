@@ -310,7 +310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Strictly enforce role-based tab isolation: users can never view other panels
   useEffect(() => {
     if (currentUser?.role === 'school_user') {
-      if (['schools', 'review', 'payroll', 'pricing', 'reports', 'settings'].includes(activeTab)) {
+      if (['schools', 'submissions', 'review', 'payroll', 'pricing', 'reports', 'settings'].includes(activeTab)) {
         setActiveTab('dashboard');
       }
       if (currentUser.schoolId) {
@@ -1285,6 +1285,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSubmissions((prev) => {
       const idx = prev.findIndex((s) => s.schoolId === schoolId && s.year === year && s.month === month);
       const now = new Date().toISOString();
+      const schoolPuantaj = puantajRows.filter((p) => p.schoolId === schoolId && p.year === year && p.month === month);
+      const totalHours = schoolPuantaj.reduce((acc, p) => acc + (p.totalHours || 0), 0);
+      const totalAmount = schoolPuantaj.reduce((acc, p) => acc + (p.estimatedPayment || 0), 0);
+
       const item: SchoolMonthlySubmission = {
         id: idx >= 0 ? prev[idx].id : `sub-${Date.now()}`,
         schoolId,
@@ -1298,8 +1302,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rejectedAt: status === 'reddedildi' ? now : undefined,
         correctionRequestedAt: status === 'duzeltme_istendi' ? now : undefined,
         totalTeachersCount: allTeachers.filter((t) => t.schoolId === schoolId).length,
-        totalLessonHours: 0,
-        totalPayableAmount: 0,
+        totalLessonHours: totalHours,
+        totalPayableAmount: totalAmount,
       };
       updatedItem = item;
 
