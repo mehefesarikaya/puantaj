@@ -36,13 +36,13 @@ export const LoginView: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-2xl mx-auto shadow-lg shadow-blue-500/30">
-          MEB
+          KED
         </div>
         <h2 className="mt-4 text-2xl font-extrabold text-white tracking-tight">
-          Puantaj ve Ek Ders Takip Sistemi
+          Kolay Ek Ders
         </h2>
         <p className="mt-1 text-xs text-blue-200">
-          Merkezi İlçe Yönetici ve Okul Personeli Giriş Kapısı
+          Öğretmen Ders Programı ve Ek Ders Puantaj Portalı
         </p>
       </div>
 
@@ -99,6 +99,12 @@ export const LoginView: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-center">
+            <span className="text-[11px] text-slate-400 font-mono">
+              kolayekders.com
+            </span>
+          </div>
         </div>
       </div>
     </div>

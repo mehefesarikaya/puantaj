@@ -223,7 +223,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp: new Date().toISOString(),
         user: 'Merkezi Yönetici',
         action: 'Sistem Başlatıldı',
-        details: 'Çok Okullu MEB Puantaj ve Yetkilendirme Platformu aktif.',
+        details: 'Kolay Ek Ders Platformu ve Yetkilendirme Sistemi aktif.',
       },
     ])
   );
@@ -292,14 +292,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [darkMode]);
 
-  // Adjust active tab when switching roles
+  // Strictly enforce role-based tab isolation: users can never view other panels
   useEffect(() => {
     if (currentUser?.role === 'school_user') {
-      if (['schools', 'review', 'payroll', 'settings'].includes(activeTab)) {
+      if (['schools', 'review', 'payroll', 'pricing', 'reports', 'settings'].includes(activeTab)) {
         setActiveTab('dashboard');
       }
       if (currentUser.schoolId) {
         setSelectedSchoolId(currentUser.schoolId);
+      }
+    } else if (currentUser?.role === 'admin') {
+      if (activeTab === 'history') {
+        setActiveTab('dashboard');
       }
     }
   }, [currentUser, activeTab]);

@@ -1,4 +1,4 @@
-# MEB Ders Ücreti Karşılığında Görevlendirilenler Aylık Puantaj Yönetim Sistemi (Merkezi Yönetici Paneli)
+# Kolay Ek Ders – Öğretmen Ders Programı, Puantaj ve Ek Ders Yönetim Platformu (kolayekders.com)
 
 Bu uygulama, Milli Eğitim Bakanlığı (MEB) bünyesinde ders ücreti karşılığında görevlendirilen ücretli öğretmen ve usta öğreticilerin aylık ders saatleri puantajlarını, vergi matrahlarını ve ek ders ödemelerini merkezi olarak yöneten, denetleyen ve onaylayan **tamamen bağımsız (standalone) bir Yönetici Paneli** uygulamasıdır.
 

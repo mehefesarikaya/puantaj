@@ -23,9 +23,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const {
     schools,
-    accounts,
     currentUser,
-    switchAccount,
     logout,
     selectedYear,
     setSelectedYear,
@@ -73,29 +71,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-200">
             <School className="w-4 h-4 text-indigo-600" />
             <span className="hidden sm:inline">Kurum:</span>
-            <span>{schools.find((s) => s.id === currentUser?.schoolId)?.name || 'Okul Paneli'}</span>
+            <span>{schools.find((s) => s.id === currentUser?.schoolId)?.name || 'Kurum Paneli'}</span>
           </div>
         )}
       </div>
 
       {/* Right Controls */}
       <div className="flex items-center space-x-2.5">
-        {/* Quick Account Switcher (For Pair-Programming & Instant Testing) */}
-        <div className="hidden sm:flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-          <span className="text-[10px] text-slate-400 font-bold uppercase">Hesap:</span>
-          <select
-            value={currentUser?.id || ''}
-            onChange={(e) => switchAccount(e.target.value)}
-            className="bg-transparent font-bold text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer text-xs"
-          >
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id} className="dark:bg-slate-800 text-slate-900 dark:text-white">
-                {acc.role === 'admin' ? '🛡️ Yönetici' : '🏫 ' + acc.fullName}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Month & Year Selector */}
         <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
           <Calendar className="w-4 h-4 text-blue-600" />

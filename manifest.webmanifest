@@ -1,0 +1,18 @@
+{
+  "name": "Kolay Ek Ders",
+  "short_name": "KolayEkDers",
+  "description": "Öğretmen ders programı, aylık ek ders puantajı ve MEB mevzuatına uygun bordro hesaplama platformu.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><rect width='24' height='24' rx='6' fill='%232563eb'/><text x='12' y='16' fill='white' font-family='sans-serif' font-weight='bold' font-size='10' text-anchor='middle'>KED</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+
