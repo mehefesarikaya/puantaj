@@ -86,14 +86,6 @@ export const AdminTeacherListView: React.FC = () => {
 
         <div className="flex items-center space-x-2">
           <button
-            onClick={toggleMaskSensitiveData}
-            className="flex items-center space-x-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            {maskSensitiveData ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            <span>{maskSensitiveData ? 'TC & IBAN Göster' : 'Bilgileri Maskele'}</span>
-          </button>
-
-          <button
             onClick={() => {
               setEditingTeacher(null);
               setIsModalOpen(true);

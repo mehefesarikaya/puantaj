@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   TableProperties,
   Download,
@@ -93,73 +93,77 @@ export const SchoolPuantajEntryView: React.FC = () => {
   const status = sub?.status || 'taslak';
   const isLocked = status === 'onaylandi' || status === 'incelemede';
 
-  // Day metadata (1..N days) with period date-range check
-  const daysMetadata = Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    const dateObj = new Date(selectedYear, selectedMonth - 1, day);
-    const dayOfWeek = dateObj.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const dayNameShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][dayOfWeek];
-    const mStr = String(selectedMonth).padStart(2, '0');
-    const dStr = String(day).padStart(2, '0');
-    const dateStr = `${selectedYear}-${mStr}-${dStr}`;
-    const isWithinPeriod =
-      (!period.startDate || dateStr >= period.startDate) &&
-      (!period.endDate || dateStr <= period.endDate);
+  // Day metadata (1..N days) with period date-range check (memoized)
+  const daysMetadata = useMemo(() => {
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const dateObj = new Date(selectedYear, selectedMonth - 1, day);
+      const dayOfWeek = dateObj.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dayNameShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][dayOfWeek];
+      const mStr = String(selectedMonth).padStart(2, '0');
+      const dStr = String(day).padStart(2, '0');
+      const dateStr = `${selectedYear}-${mStr}-${dStr}`;
+      const isWithinPeriod =
+        (!period.startDate || dateStr >= period.startDate) &&
+        (!period.endDate || dateStr <= period.endDate);
 
-    return { day, isWeekend, dayNameShort, dateStr, isWithinPeriod };
-  });
+      return { day, isWeekend, dayNameShort, dateStr, isWithinPeriod };
+    });
+  }, [daysInMonth, selectedYear, selectedMonth, period.startDate, period.endDate]);
 
-  // Table rows with duty details
-  const tableRows = schoolTeachers.map((teacher) => {
-    const rowData = puantajRows.find(
-      (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
-    );
-    const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
-    const effectiveRow = schedule
-      ? syncTeacherScheduleToMonth({
-          teacher,
-          schedule,
-          year: selectedYear,
-          month: selectedMonth,
-          existingRow: rowData,
-          periodStartDate: period.startDate,
-          periodEndDate: period.endDate,
-          rules,
-        }).updatedRow
-      : rowData;
+  // Table rows with duty details (memoized)
+  const tableRows = useMemo(() => {
+    return schoolTeachers.map((teacher) => {
+      const rowData = puantajRows.find(
+        (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
+      );
+      const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+      const effectiveRow = schedule
+        ? syncTeacherScheduleToMonth({
+            teacher,
+            schedule,
+            year: selectedYear,
+            month: selectedMonth,
+            existingRow: rowData,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            rules,
+          }).updatedRow
+        : rowData;
 
-    const daily = effectiveRow ? effectiveRow.dailyHours : {};
-    const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
-    const total = effectiveRow ? effectiveRow.totalHours : 0;
-    const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
-    const payable = effectiveRow ? effectiveRow.payableTotalHours : total;
-    const payment = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
+      const daily = effectiveRow ? effectiveRow.dailyHours : {};
+      const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
+      const total = effectiveRow ? effectiveRow.totalHours : 0;
+      const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
+      const payable = effectiveRow ? effectiveRow.payableTotalHours : total;
+      const payment = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
 
-    const dutyDaily = effectiveRow ? effectiveRow.dutyDailyHours || {} : {};
-    const dutyStatuses = effectiveRow ? effectiveRow.dutyDailyStatuses || {} : {};
-    const dutyTotal = effectiveRow ? (effectiveRow.dutyTotalHours ?? 0) : 0;
-    const dutyPayment = effectiveRow
-      ? (effectiveRow.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
-      : (dutyTotal * teacher.hourlyRate);
-    const hasDuty = Boolean(teacher.guardDutyDay || dutyTotal > 0 || Object.keys(dutyDaily).length > 0);
+      const dutyDaily = effectiveRow ? effectiveRow.dutyDailyHours || {} : {};
+      const dutyStatuses = effectiveRow ? effectiveRow.dutyDailyStatuses || {} : {};
+      const dutyTotal = effectiveRow ? (effectiveRow.dutyTotalHours ?? 0) : 0;
+      const dutyPayment = effectiveRow
+        ? (effectiveRow.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
+        : (dutyTotal * teacher.hourlyRate);
+      const hasDuty = Boolean(teacher.guardDutyDay || dutyTotal > 0 || Object.keys(dutyDaily).length > 0);
 
-    return {
-      teacher,
-      rowData: rowData || effectiveRow,
-      daily,
-      statuses,
-      total,
-      bonus,
-      payable,
-      payment,
-      hasDuty,
-      dutyDaily,
-      dutyStatuses,
-      dutyTotal,
-      dutyPayment,
-    };
-  });
+      return {
+        teacher,
+        rowData: rowData || effectiveRow,
+        daily,
+        statuses,
+        total,
+        bonus,
+        payable,
+        payment,
+        hasDuty,
+        dutyDaily,
+        dutyStatuses,
+        dutyTotal,
+        dutyPayment,
+      };
+    });
+  }, [schoolTeachers, puantajRows, weeklySchedules, selectedYear, selectedMonth, period.startDate, period.endDate, rules]);
 
   // Puantaj Raporu açıldığında haftalık ders programını ayın tamamına yay ve veritabanına otomatik kaydet
   useEffect(() => {
@@ -312,16 +316,12 @@ export const SchoolPuantajEntryView: React.FC = () => {
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
                   isPeriodClosed
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed opacity-60'
-                    : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                 }`}
-                title={
-                  isPeriodClosed
-                    ? 'Puantaj dönemi kapalı olduğu için program aktarımı yapılamaz'
-                    : 'Haftalık ders programındaki dersleri bu ayın puantaj cetveline otomatik işler'
-                }
+                title="Haftalık ders programındaki dersleri puantaj cetveline tekrar senkronize eder"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Programdan Aktar</span>
+                <span>Programı Yenile</span>
               </button>
 
               <button
@@ -332,27 +332,10 @@ export const SchoolPuantajEntryView: React.FC = () => {
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed opacity-60'
                     : 'bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800'
                 }`}
-                title={
-                  isPeriodClosed
-                    ? 'Puantaj dönemi kapalı olduğu için işlem yapılamaz'
-                    : 'Programdan aktarılan tüm planlanan dersleri tek tıkla fiili gerçekleşen ders olarak onaylar'
-                }
+                title="Programdan aktarılan tüm planlanan dersleri tek tıkla fiili gerçekleşen ders olarak onaylar"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Planlananları Onayla</span>
-              </button>
-
-              <button
-                onClick={handleSaveDraft}
-                disabled={isPeriodClosed}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                  isPeriodClosed
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed opacity-60'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Taslak Olarak Kaydet</span>
               </button>
 
               <button
@@ -361,7 +344,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
                 className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow transition-all ${
                   isPeriodClosed
                     ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
                 }`}
               >
                 <Send className="w-3.5 h-3.5" />
@@ -380,7 +363,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
 
           <button
             onClick={() => window.print()}
-            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700"
             title="Yazdır"
           >
             <Printer className="w-4 h-4" />

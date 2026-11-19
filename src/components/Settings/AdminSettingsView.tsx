@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Loader2,
   X,
+  Coins,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MebPaymentRules } from '../../types';
@@ -24,7 +25,6 @@ import { SecurityTestReport } from '../../services/securityTestService';
 export const AdminSettingsView: React.FC = () => {
   const {
     rules,
-    updateRules,
     auditLogs,
     resetToDefaults,
     isSupabaseActive,
@@ -32,10 +32,8 @@ export const AdminSettingsView: React.FC = () => {
     isMigrating,
     migrateToSupabase,
     runSecurityAudit,
+    setActiveTab,
   } = useApp();
-
-  const [formRules, setFormRules] = useState<MebPaymentRules>(rules);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Migration modal state
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
@@ -45,13 +43,6 @@ export const AdminSettingsView: React.FC = () => {
   const [securityReport, setSecurityReport] = useState<SecurityTestReport | null>(null);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [isRunningSecurity, setIsRunningSecurity] = useState(false);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateRules(formRules);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
 
   const handleRunMigration = async () => {
     const res = await migrateToSupabase();
@@ -83,121 +74,46 @@ export const AdminSettingsView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payment Rules Form */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-          <div className="flex items-center space-x-2 pb-4 border-b border-slate-100 dark:border-slate-700 mb-4">
-            <Settings className="w-5 h-5 text-blue-600" />
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              MEB Ders Ücreti ve Katsayı Parametreleri
-            </h3>
+        {/* Payment Rules Redirect Card */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center space-x-2 pb-4 border-b border-slate-100 dark:border-slate-700 mb-4">
+              <Coins className="w-5 h-5 text-blue-600" />
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                MEB Ek Ders Ücret ve Katsayı Parametreleri
+              </h3>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Milli Eğitim Bakanlığı ek ders saatlik birim ücretleri, akademik unvan artırımları (Yüksek Lisans, Doktora), özel eğitim, DYK kursları ve branş tanımlamaları merkezi olarak <strong>Ücret ve Kurallar</strong> sekmesinde gerçek Supabase veritabanına bağlı şekilde yönetilmektedir.
+            </p>
+
+            <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-800 dark:text-blue-300 space-y-1">
+              <div className="font-bold">Aktif Katsayı Parametreleri (2026 H2):</div>
+              <div className="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
+                <span className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700">
+                  Gündüz: {rules.gunduzHourlyRate || rules.ucretliHourlyRate} TL
+                </span>
+                <span className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700">
+                  Gece: {rules.geceHaftasonuHourlyRate || 236.33} TL
+                </span>
+                <span className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-700">
+                  Gelir Vergisi: %{(rules.incomeTaxRate || 0.15) * 100}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Ders Saati Net/Brüt Birim Ücreti (TL)
-                </label>
-                <input
-                  type="number"
-                  step={0.5}
-                  min={50}
-                  value={formRules.ucretliHourlyRate}
-                  onChange={(e) =>
-                    setFormRules({ ...formRules, ucretliHourlyRate: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Gelir Vergisi Oranı (%)
-                </label>
-                <input
-                  type="number"
-                  step={0.01}
-                  value={formRules.incomeTaxRate * 100}
-                  onChange={(e) =>
-                    setFormRules({
-                      ...formRules,
-                      incomeTaxRate: Number(e.target.value) / 100,
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Damga Vergisi Oranı (Binde)
-                </label>
-                <input
-                  type="number"
-                  step={0.001}
-                  value={formRules.stampTaxRate * 1000}
-                  onChange={(e) =>
-                    setFormRules({
-                      ...formRules,
-                      stampTaxRate: Number(e.target.value) / 1000,
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  SGK İşçi Payı (%)
-                </label>
-                <input
-                  type="number"
-                  step={0.1}
-                  value={formRules.sgkEmployeeShareRate * 100}
-                  onChange={(e) =>
-                    setFormRules({
-                      ...formRules,
-                      sgkEmployeeShareRate: Number(e.target.value) / 100,
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <label className="flex items-center space-x-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
-                <input
-                  type="checkbox"
-                  checked={formRules.bonusFiveToOne}
-                  onChange={(e) =>
-                    setFormRules({ ...formRules, bonusFiveToOne: e.target.checked })
-                  }
-                  className="rounded text-blue-600"
-                />
-                <span>
-                  Her 5 Ders Saatine 1 Saat İlave Edilsin (MEB Hazırlık ve Planlama Kuralı)
-                </span>
-              </label>
-            </div>
-
-            {saveSuccess && (
-              <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Parametreler başarıyla güncellendi!</span>
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
-              <button
-                type="submit"
-                className="flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow"
-              >
-                <Save className="w-4 h-4" />
-                <span>Ayarları Kaydet</span>
-              </button>
-            </div>
-          </form>
+          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setActiveTab('pricing')}
+              className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition-all"
+            >
+              <span>Ücret ve Kurallar Yönetimine Git</span>
+              <ArrowRightLeft className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Database & Independent Architecture */}

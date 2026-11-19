@@ -9,6 +9,7 @@ import {
   SubmissionStatus,
   TimesheetPeriod,
   TimesheetPeriodStatus,
+  BranchItem,
 } from '../types';
 
 // =====================================================================
@@ -682,6 +683,43 @@ export const supabaseDataService = {
   async deleteTimesheetPeriod(periodId: string): Promise<void> {
     if (!supabase) return;
     const { error } = await supabase.from('timesheet_periods').delete().eq('id', periodId);
+    if (error) throw error;
+  },
+
+  // --- Branches ---
+  async fetchBranches(): Promise<BranchItem[]> {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error || !data) return [];
+      return data.map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        category: b.category,
+        isCustom: Boolean(b.is_custom),
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  async createBranch(branch: BranchItem): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from('branches').upsert({
+      id: branch.id,
+      name: branch.name,
+      category: branch.category,
+      is_custom: Boolean(branch.isCustom),
+    });
+    if (error) throw error;
+  },
+
+  async deleteBranch(branchId: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from('branches').delete().eq('id', branchId);
     if (error) throw error;
   },
 };

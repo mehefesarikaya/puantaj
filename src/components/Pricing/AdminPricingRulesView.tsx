@@ -19,12 +19,10 @@ import { MebPaymentRules, BranchCategory } from '../../types';
 import { DEFAULT_MEB_PAYMENT_RULES, formatTRY } from '../../utils/paymentCalculator';
 import {
   BRANCH_CATEGORY_CONFIGS,
-  getStoredBranches,
-  saveStoredBranches,
 } from '../../utils/branchData';
 
 export const AdminPricingRulesView: React.FC = () => {
-  const { rules, updateRules, currentUser } = useApp();
+  const { rules, updateRules, currentUser, branches, addBranch, deleteBranch } = useApp();
   const isAdmin = currentUser?.role === 'admin';
 
   // Rule Form States
@@ -56,7 +54,6 @@ export const AdminPricingRulesView: React.FC = () => {
   }, [rules]);
 
   // Branch list state
-  const [branches, setBranches] = useState(() => getStoredBranches());
   const [newBranchName, setNewBranchName] = useState('');
   const [newBranchCategory, setNewBranchCategory] = useState<BranchCategory>('genel_bilgi_ve_brans');
 
@@ -101,24 +98,26 @@ export const AdminPricingRulesView: React.FC = () => {
     }
   };
 
-  const handleAddBranch = () => {
+  const handleAddBranch = async () => {
     if (!newBranchName.trim()) return;
-    const newBranch = {
-      id: `b-${Date.now()}`,
-      name: newBranchName.trim(),
-      category: newBranchCategory,
-      isCustom: true,
-    };
-    const updated = [...branches, newBranch];
-    setBranches(updated);
-    saveStoredBranches(updated);
-    setNewBranchName('');
+    try {
+      await addBranch({
+        name: newBranchName.trim(),
+        category: newBranchCategory,
+        isCustom: true,
+      });
+      setNewBranchName('');
+    } catch (err: any) {
+      alert(err?.message || 'Branş eklenemedi.');
+    }
   };
 
-  const handleDeleteBranch = (id: string) => {
-    const updated = branches.filter((b) => b.id !== id);
-    setBranches(updated);
-    saveStoredBranches(updated);
+  const handleDeleteBranch = async (id: string) => {
+    try {
+      await deleteBranch(id);
+    } catch (err: any) {
+      alert(err?.message || 'Branş silinemedi.');
+    }
   };
 
   const handleResetToOfficialDefaults = () => {

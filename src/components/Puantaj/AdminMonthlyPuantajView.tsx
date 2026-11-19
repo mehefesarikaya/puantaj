@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TableProperties,
   Download,
@@ -116,72 +116,76 @@ export const AdminMonthlyPuantajView: React.FC = () => {
     ? 'Tüm Kurumlar'
     : `${selectedDirectorate} (Tüm Kurumlar)`;
 
-  // Compute day of week for each day 1..daysInMonth
-  const daysMetadata = Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    const dateObj = new Date(selectedYear, selectedMonth - 1, day);
-    const dayOfWeek = dateObj.getDay(); // 0 is Sun, 6 is Sat
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const dayNameShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][dayOfWeek];
-    const mStr = String(selectedMonth).padStart(2, '0');
-    const dStr = String(day).padStart(2, '0');
-    const dateStr = `${selectedYear}-${mStr}-${dStr}`;
-    const isWithinPeriod =
-      (!currentPeriod.startDate || dateStr >= currentPeriod.startDate) &&
-      (!currentPeriod.endDate || dateStr <= currentPeriod.endDate);
-    return { day, dayOfWeek, isWeekend, dayNameShort, dateStr, isWithinPeriod };
-  });
+  // Compute day of week for each day 1..daysInMonth (memoized)
+  const daysMetadata = useMemo(() => {
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const dateObj = new Date(selectedYear, selectedMonth - 1, day);
+      const dayOfWeek = dateObj.getDay(); // 0 is Sun, 6 is Sat
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dayNameShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][dayOfWeek];
+      const mStr = String(selectedMonth).padStart(2, '0');
+      const dStr = String(day).padStart(2, '0');
+      const dateStr = `${selectedYear}-${mStr}-${dStr}`;
+      const isWithinPeriod =
+        (!currentPeriod.startDate || dateStr >= currentPeriod.startDate) &&
+        (!currentPeriod.endDate || dateStr <= currentPeriod.endDate);
+      return { day, dayOfWeek, isWeekend, dayNameShort, dateStr, isWithinPeriod };
+    });
+  }, [daysInMonth, selectedYear, selectedMonth, currentPeriod.startDate, currentPeriod.endDate]);
 
-  // Calculate table rows with teacher details and separate duty rows
-  const tableRows = activeTeachers.map((teacher) => {
-    const rowData = puantajRows.find(
-      (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
-    );
-    const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
-    const effectiveRow = schedule
-      ? syncTeacherScheduleToMonth({
-          teacher,
-          schedule,
-          year: selectedYear,
-          month: selectedMonth,
-          existingRow: rowData,
-          periodStartDate: currentPeriod.startDate,
-          periodEndDate: currentPeriod.endDate,
-          rules,
-        }).updatedRow
-      : rowData;
+  // Calculate table rows with teacher details and separate duty rows (memoized)
+  const tableRows = useMemo(() => {
+    return activeTeachers.map((teacher) => {
+      const rowData = puantajRows.find(
+        (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
+      );
+      const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+      const effectiveRow = schedule
+        ? syncTeacherScheduleToMonth({
+            teacher,
+            schedule,
+            year: selectedYear,
+            month: selectedMonth,
+            existingRow: rowData,
+            periodStartDate: currentPeriod.startDate,
+            periodEndDate: currentPeriod.endDate,
+            rules,
+          }).updatedRow
+        : rowData;
 
-    const daily = effectiveRow ? effectiveRow.dailyHours : {};
-    const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
-    const total = effectiveRow ? effectiveRow.totalHours : 0;
-    const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
-    const payable = effectiveRow ? effectiveRow.payableTotalHours : total;
-    const payment = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
+      const daily = effectiveRow ? effectiveRow.dailyHours : {};
+      const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
+      const total = effectiveRow ? effectiveRow.totalHours : 0;
+      const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;
+      const payable = effectiveRow ? effectiveRow.payableTotalHours : total;
+      const payment = effectiveRow ? effectiveRow.estimatedPayment : payable * teacher.hourlyRate;
 
-    const dutyDaily = effectiveRow ? effectiveRow.dutyDailyHours || {} : {};
-    const dutyStatuses = effectiveRow ? effectiveRow.dutyDailyStatuses || {} : {};
-    const dutyTotal = effectiveRow ? (effectiveRow.dutyTotalHours ?? 0) : 0;
-    const dutyPayment = effectiveRow
-      ? (effectiveRow.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
-      : (dutyTotal * teacher.hourlyRate);
-    const hasDuty = Boolean(teacher.guardDutyDay || dutyTotal > 0 || Object.keys(dutyDaily).length > 0);
+      const dutyDaily = effectiveRow ? effectiveRow.dutyDailyHours || {} : {};
+      const dutyStatuses = effectiveRow ? effectiveRow.dutyDailyStatuses || {} : {};
+      const dutyTotal = effectiveRow ? (effectiveRow.dutyTotalHours ?? 0) : 0;
+      const dutyPayment = effectiveRow
+        ? (effectiveRow.dutyEstimatedPayment ?? (dutyTotal * teacher.hourlyRate))
+        : (dutyTotal * teacher.hourlyRate);
+      const hasDuty = Boolean(teacher.guardDutyDay || dutyTotal > 0 || Object.keys(dutyDaily).length > 0);
 
-    return {
-      teacher,
-      rowData: rowData || effectiveRow,
-      daily,
-      statuses,
-      total,
-      bonus,
-      payable,
-      payment,
-      hasDuty,
-      dutyDaily,
-      dutyStatuses,
-      dutyTotal,
-      dutyPayment,
-    };
-  });
+      return {
+        teacher,
+        rowData: rowData || effectiveRow,
+        daily,
+        statuses,
+        total,
+        bonus,
+        payable,
+        payment,
+        hasDuty,
+        dutyDaily,
+        dutyStatuses,
+        dutyTotal,
+        dutyPayment,
+      };
+    });
+  }, [activeTeachers, puantajRows, weeklySchedules, selectedYear, selectedMonth, currentPeriod.startDate, currentPeriod.endDate, rules]);
 
   // Grand totals
   const grandTotalActual = tableRows.reduce((acc, r) => acc + r.total, 0);
@@ -263,23 +267,6 @@ export const AdminMonthlyPuantajView: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => downloadOriginalMonthlyTemplate(selectedYear, selectedMonth)}
-            className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
-            title="Orijinal MEB formatında boş şablon indir"
-          >
-            <Download className="w-3.5 h-3.5 text-blue-600" />
-            <span>Şablonu İndir (.xlsx)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reports')}
-            className="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-xl text-xs font-semibold border border-blue-200 dark:border-blue-800 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Excel İçe Aktar</span>
-          </button>
-
-          <button
             onClick={handleExportExcel}
             className="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
@@ -288,8 +275,17 @@ export const AdminMonthlyPuantajView: React.FC = () => {
           </button>
 
           <button
+            onClick={() => downloadOriginalMonthlyTemplate(selectedYear, selectedMonth)}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
+            title="Orijinal MEB formatında boş şablon indir"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-600" />
+            <span>Boş Şablon (.xlsx)</span>
+          </button>
+
+          <button
             onClick={() => window.print()}
-            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700"
             title="Yazdır"
           >
             <Printer className="w-4 h-4" />

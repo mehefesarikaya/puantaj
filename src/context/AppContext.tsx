@@ -14,7 +14,9 @@ import {
   TimesheetPeriodStatus,
   GeneralDirectorate,
   GENERAL_DIRECTORATES,
+  BranchItem,
 } from '../types';
+import { getStoredBranches, saveStoredBranches } from '../utils/branchData';
 import {
   INITIAL_SCHOOLS,
   INITIAL_TEACHERS,
@@ -54,6 +56,7 @@ interface AppContextType {
   currentUser: UserAccount | null;
   weeklySchedules: TeacherWeeklySchedule[];
   timesheetPeriods: TimesheetPeriod[];
+  branches: BranchItem[];
 
   // Supabase & Backend Status
   isSupabaseActive: boolean;
@@ -161,6 +164,10 @@ interface AppContextType {
   updateRules: (newRules: MebPaymentRules) => Promise<void>;
   resetToDefaults: () => void;
 
+  // Branch actions
+  addBranch: (branch: Omit<BranchItem, 'id'>) => Promise<void>;
+  deleteBranch: (id: string) => Promise<void>;
+
   // Migration & Security Audit
   migrateToSupabase: () => Promise<MigrationResult>;
   runSecurityAudit: () => Promise<SecurityTestReport>;
@@ -255,6 +262,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadStoredData(STORAGE_KEYS.TIMESHEET_PERIODS, INITIAL_TIMESHEET_PERIODS)
   );
 
+  const [branches, setBranches] = useState<BranchItem[]>(() => getStoredBranches());
+
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(10); // Ekim
@@ -288,6 +297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => saveStoredData(STORAGE_KEYS.WEEKLY_SCHEDULES, weeklySchedules), [weeklySchedules]);
   useEffect(() => saveStoredData(STORAGE_KEYS.TIMESHEET_PERIODS, timesheetPeriods), [timesheetPeriods]);
   useEffect(() => saveStoredData(STORAGE_KEYS.DIRECTORATE, selectedDirectorate), [selectedDirectorate]);
+  useEffect(() => saveStoredBranches(branches), [branches]);
 
   useEffect(() => {
     if (darkMode) {
@@ -342,6 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabaseDataService.fetchWeeklySchedules(),
         supabaseDataService.fetchAuditLogs(),
         supabaseDataService.fetchPuantajRows(selectedYear, selectedMonth),
+        supabaseDataService.fetchBranches(),
       ]);
 
       const [
@@ -353,6 +364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         remoteSchedules,
         remoteLogs,
         remotePuantaj,
+        remoteBranches,
       ] = await Promise.race([fetchAllPromise, timeoutPromise]);
 
       if (remoteSchools) setSchools(remoteSchools);
@@ -363,6 +375,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (remoteSchedules) setWeeklySchedules(remoteSchedules);
       if (remoteLogs && remoteLogs.length > 0) setAuditLogs(remoteLogs);
       if (remotePuantaj) setPuantajRows(remotePuantaj);
+      if (remoteBranches && remoteBranches.length > 0) setBranches(remoteBranches);
       setBackendMode('supabase');
     } catch (err) {
       console.warn('Supabase remote sync fallback to local:', err);
@@ -1321,6 +1334,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const updatedTeachers = [...allTeachers];
     const newPuantajList: TeacherMonthlyPuantajRow[] = [...puantajRows];
+    const newlyCreatedTeachers: Teacher[] = [];
 
     for (const item of importedRows) {
       let teacher = updatedTeachers.find(
@@ -1345,6 +1359,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isActive: true,
         };
         updatedTeachers.push(teacher);
+        newlyCreatedTeachers.push(teacher);
       }
 
       const total = Object.values(item.dailyHours).reduce((acc: number, val) => acc + (val || 0), 0);
@@ -1382,6 +1397,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPuantajRows(newPuantajList);
 
     if (isSupabaseActive) {
+      if (newlyCreatedTeachers.length > 0) {
+        newlyCreatedTeachers.forEach((t) => supabaseDataService.upsertTeacher(t).catch(console.error));
+      }
       supabaseDataService.batchUpsertPuantajRows(newPuantajList).catch(console.error);
     }
     logAction('Excel İçe Aktarıldı', `${importedRows.length} öğretmenin verisi yüklendi.`);
@@ -1704,6 +1722,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAction('Sistem Sıfırlandı', 'Orijinal test verileriyle sistem sıfırlandı.');
   };
 
+  const addBranch = async (branchData: Omit<BranchItem, 'id'>) => {
+    const newBranch: BranchItem = {
+      ...branchData,
+      id: `branch-${Date.now()}`,
+      isCustom: true,
+    };
+    setBranches((prev) => [...prev, newBranch]);
+    if (isSupabaseActive) {
+      try {
+        await supabaseDataService.createBranch(newBranch);
+      } catch (err) {
+        console.warn('Branş Supabase kaydı hatası:', err);
+      }
+    }
+    logAction('Yeni Branş Eklendi', `${newBranch.name} (${newBranch.category}) branşı eklendi.`);
+  };
+
+  const deleteBranch = async (id: string) => {
+    const target = branches.find((b) => b.id === id);
+    setBranches((prev) => prev.filter((b) => b.id !== id));
+    if (isSupabaseActive) {
+      try {
+        await supabaseDataService.deleteBranch(id);
+      } catch (err) {
+        console.warn('Branş Supabase silme hatası:', err);
+      }
+    }
+    logAction('Branş Silindi', `${target?.name || id} branşı kaldırıldı.`);
+  };
+
   // Safe migration helper
   const migrateToSupabase = async (): Promise<MigrationResult> => {
     setIsMigrating(true);
@@ -1792,6 +1840,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteTimesheetPeriod,
         updateRules,
         resetToDefaults,
+        branches,
+        addBranch,
+        deleteBranch,
         migrateToSupabase,
         runSecurityAudit,
       }}

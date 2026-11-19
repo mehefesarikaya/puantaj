@@ -1,22 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { useApp } from './context/AppContext';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { LoginView } from './components/Auth/LoginView';
-import { AdminDashboardView } from './components/Dashboard/AdminDashboardView';
-import { SchoolListView } from './components/Schools/SchoolListView';
-import { AdminTeacherListView } from './components/Teachers/AdminTeacherListView';
-import { AdminMonthlyPuantajView } from './components/Puantaj/AdminMonthlyPuantajView';
-import { MonthlyReviewView } from './components/Review/MonthlyReviewView';
-import { AdminPayrollCalculationView } from './components/Payroll/AdminPayrollCalculationView';
-import { AdminReportsView } from './components/Reports/AdminReportsView';
-import { AdminSettingsView } from './components/Settings/AdminSettingsView';
-import { SchoolDashboardView } from './components/SchoolPanel/SchoolDashboardView';
-import { SchoolTeacherListView } from './components/SchoolPanel/SchoolTeacherListView';
-import { SchoolPuantajEntryView } from './components/SchoolPanel/SchoolPuantajEntryView';
-import { SchoolHistoryView } from './components/SchoolPanel/SchoolHistoryView';
-import { WeeklyScheduleOverviewView } from './components/Schedule/WeeklyScheduleOverviewView';
-import { AdminPricingRulesView } from './components/Pricing/AdminPricingRulesView';
+
+const AdminDashboardView = lazy(() =>
+  import('./components/Dashboard/AdminDashboardView').then((m) => ({ default: m.AdminDashboardView }))
+);
+const SchoolListView = lazy(() =>
+  import('./components/Schools/SchoolListView').then((m) => ({ default: m.SchoolListView }))
+);
+const AdminTeacherListView = lazy(() =>
+  import('./components/Teachers/AdminTeacherListView').then((m) => ({ default: m.AdminTeacherListView }))
+);
+const AdminMonthlyPuantajView = lazy(() =>
+  import('./components/Puantaj/AdminMonthlyPuantajView').then((m) => ({ default: m.AdminMonthlyPuantajView }))
+);
+const MonthlyReviewView = lazy(() =>
+  import('./components/Review/MonthlyReviewView').then((m) => ({ default: m.MonthlyReviewView }))
+);
+const AdminPayrollCalculationView = lazy(() =>
+  import('./components/Payroll/AdminPayrollCalculationView').then((m) => ({ default: m.AdminPayrollCalculationView }))
+);
+const AdminReportsView = lazy(() =>
+  import('./components/Reports/AdminReportsView').then((m) => ({ default: m.AdminReportsView }))
+);
+const AdminSettingsView = lazy(() =>
+  import('./components/Settings/AdminSettingsView').then((m) => ({ default: m.AdminSettingsView }))
+);
+const SchoolDashboardView = lazy(() =>
+  import('./components/SchoolPanel/SchoolDashboardView').then((m) => ({ default: m.SchoolDashboardView }))
+);
+const SchoolTeacherListView = lazy(() =>
+  import('./components/SchoolPanel/SchoolTeacherListView').then((m) => ({ default: m.SchoolTeacherListView }))
+);
+const SchoolPuantajEntryView = lazy(() =>
+  import('./components/SchoolPanel/SchoolPuantajEntryView').then((m) => ({ default: m.SchoolPuantajEntryView }))
+);
+const SchoolHistoryView = lazy(() =>
+  import('./components/SchoolPanel/SchoolHistoryView').then((m) => ({ default: m.SchoolHistoryView }))
+);
+const WeeklyScheduleOverviewView = lazy(() =>
+  import('./components/Schedule/WeeklyScheduleOverviewView').then((m) => ({ default: m.WeeklyScheduleOverviewView }))
+);
+const AdminPricingRulesView = lazy(() =>
+  import('./components/Pricing/AdminPricingRulesView').then((m) => ({ default: m.AdminPricingRulesView }))
+);
 
 export const App: React.FC = () => {
   const { activeTab, currentUser, isAuthChecking } = useApp();
@@ -97,7 +126,15 @@ export const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 flex flex-col justify-between">
           <div className="max-w-[1600px] mx-auto w-full">
-            {renderActiveView()}
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center p-16 text-slate-400">
+                  <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }
+            >
+              {renderActiveView()}
+            </Suspense>
           </div>
 
           <footer className="mt-8 pt-4 pb-2 border-t border-slate-200 dark:border-slate-800 text-center text-[11px] text-slate-400 dark:text-slate-500">
