@@ -21,6 +21,7 @@ import {
   calculateMonthlyTeacherPayment,
   calculateEffectiveHourlyRate,
 } from '../../utils/additionalTeachingCalculator';
+import { syncTeacherScheduleToMonth } from '../../utils/schedulePuantajSync';
 import { formatTRY } from '../../utils/paymentCalculator';
 import { Teacher, AdditionalTeachingCalculationResult, GENERAL_DIRECTORATES } from '../../types';
 
@@ -37,6 +38,7 @@ export const AdminPayrollCalculationView: React.FC = () => {
     selectedDirectorate,
     setSelectedDirectorate,
     getTeacherSchedule,
+    getTimesheetPeriod,
   } = useApp();
 
   const [inspectTeacher, setInspectTeacher] = useState<{
@@ -66,12 +68,26 @@ export const AdminPayrollCalculationView: React.FC = () => {
       (effectiveSchoolId === 'all' || t.schoolId === effectiveSchoolId)
   );
 
+  const currentPeriod = getTimesheetPeriod(selectedYear, selectedMonth);
+
   const calculatedItems = activeTeachers.map((teacher) => {
     const row = puantajRows.find(
       (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
     );
-    const actualHours = row ? row.totalHours : 0;
     const schedule = getTeacherSchedule(teacher.id);
+    const effectiveRow = schedule
+      ? syncTeacherScheduleToMonth({
+          teacher,
+          schedule,
+          year: selectedYear,
+          month: selectedMonth,
+          existingRow: row,
+          periodStartDate: currentPeriod?.startDate,
+          periodEndDate: currentPeriod?.endDate,
+          rules,
+        }).updatedRow
+      : row;
+    const actualHours = effectiveRow ? effectiveRow.totalHours : 0;
     const calc = calculateMonthlyTeacherPayment(teacher, schedule, actualHours, rules, 4);
     return {
       teacher,

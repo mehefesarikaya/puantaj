@@ -47,14 +47,24 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
   onClose,
   teacher,
 }) => {
-  const { rules, getTeacherSchedule, saveWeeklySchedule } = useApp();
+  const {
+    currentUser,
+    rules,
+    getTeacherSchedule,
+    saveWeeklySchedule,
+    getTimesheetPeriod,
+    selectedYear,
+    selectedMonth,
+  } = useApp();
+  const isAdmin = currentUser?.role === 'admin';
+  const activePeriod = getTimesheetPeriod(selectedYear, selectedMonth);
   const existingSchedule = getTeacherSchedule(teacher.id);
 
   const [effectiveStartDate, setEffectiveStartDate] = useState(
-    existingSchedule?.effectiveStartDate || '2026-09-01'
+    existingSchedule?.effectiveStartDate || activePeriod.startDate || '2026-09-01'
   );
   const [effectiveEndDate, setEffectiveEndDate] = useState(
-    existingSchedule?.effectiveEndDate || ''
+    existingSchedule?.effectiveEndDate || activePeriod.endDate || ''
   );
   const [lessons, setLessons] = useState<WeeklyLessonBlock[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -139,8 +149,8 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
         id: existingSchedule?.id || `sched-${teacher.id}-${Date.now()}`,
         teacherId: teacher.id,
         schoolId: teacher.schoolId,
-        effectiveStartDate,
-        effectiveEndDate: effectiveEndDate || undefined,
+        effectiveStartDate: isAdmin ? effectiveStartDate : (activePeriod.startDate || effectiveStartDate),
+        effectiveEndDate: isAdmin ? (effectiveEndDate || undefined) : (activePeriod.endDate || undefined),
         lessons,
         totalWeeklyHours,
         updatedAt: new Date().toISOString(),
@@ -194,32 +204,49 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Weekly Timetable (Monday - Sunday) */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Effective Dates */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap items-center gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Geçerlilik Başlangıcı:
-                </span>
-                <input
-                  type="date"
-                  value={effectiveStartDate}
-                  onChange={(e) => setEffectiveStartDate(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                />
-              </div>
+            {/* Effective Dates: Admin belirler; Kurum kullanıcısı yalnızca adminin belirlediği aktif aralığı görür */}
+            {isAdmin ? (
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap items-center gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Geçerlilik Başlangıcı:
+                  </span>
+                  <input
+                    type="date"
+                    value={effectiveStartDate}
+                    onChange={(e) => setEffectiveStartDate(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  />
+                </div>
 
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Bitiş Tarihi (Opsiyonel):
-                </span>
-                <input
-                  type="date"
-                  value={effectiveEndDate}
-                  onChange={(e) => setEffectiveEndDate(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Bitiş Tarihi (Opsiyonel):
+                  </span>
+                  <input
+                    type="date"
+                    value={effectiveEndDate}
+                    onChange={(e) => setEffectiveEndDate(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-blue-100 dark:border-slate-700 bg-blue-50/60 dark:bg-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Yetkili Puantaj ve Dağıtım Aralığı:
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-750 border border-blue-200 dark:border-slate-600 font-mono font-bold text-blue-700 dark:text-blue-300 shadow-sm">
+                    {activePeriod.startDate} → {activePeriod.endDate}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  * Tarih sınırları İlçe MEM yöneticisi tarafından belirlenir; kurumlar tarafından değiştirilemez.
+                </span>
+              </div>
+            )}
 
             {/* Days Accordion / Blocks */}
             <div className="space-y-3">

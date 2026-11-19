@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TableProperties,
   Download,
@@ -116,13 +116,18 @@ export const SchoolPuantajEntryView: React.FC = () => {
       (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
     );
     const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
-    const effectiveRow = rowData || (schedule ? syncTeacherScheduleToMonth({
-      teacher,
-      schedule,
-      year: selectedYear,
-      month: selectedMonth,
-      rules,
-    }).updatedRow : null);
+    const effectiveRow = schedule
+      ? syncTeacherScheduleToMonth({
+          teacher,
+          schedule,
+          year: selectedYear,
+          month: selectedMonth,
+          existingRow: rowData,
+          periodStartDate: period.startDate,
+          periodEndDate: period.endDate,
+          rules,
+        }).updatedRow
+      : rowData;
 
     const daily = effectiveRow ? effectiveRow.dailyHours : {};
     const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
@@ -156,17 +161,24 @@ export const SchoolPuantajEntryView: React.FC = () => {
     };
   });
 
-  const grandTotalActual = tableRows.reduce((acc, r) => acc + r.total + (r.hasDuty ? r.dutyTotal : 0), 0);
+  // Puantaj Raporu açıldığında haftalık ders programını ayın tamamına yay ve veritabanına otomatik kaydet
+  useEffect(() => {
+    if (!isLocked && !isPeriodClosed && school?.id) {
+      syncAllSchedulesToTimesheet(school.id, selectedYear, selectedMonth, true);
+    }
+  }, [school?.id, selectedYear, selectedMonth, isLocked, isPeriodClosed]);
+
+  // Grand totals
+  const grandTotalActual = tableRows.reduce((acc, r) => acc + r.total, 0);
   const grandTotalBonus = tableRows.reduce((acc, r) => acc + r.bonus, 0);
-  const grandTotalPayable = tableRows.reduce((acc, r) => acc + r.payable + (r.hasDuty ? r.dutyTotal : 0), 0);
-  const grandTotalPayment = tableRows.reduce((acc, r) => acc + r.payment + (r.hasDuty ? r.dutyPayment : 0), 0);
+  const grandTotalPayable = tableRows.reduce((acc, r) => acc + r.payable, 0);
+  const grandTotalPayment = tableRows.reduce((acc, r) => acc + r.payment, 0);
 
   // Column totals combining regular and duty hours
   const dailyColumnTotals = daysMetadata.map(({ day }) => {
     return tableRows.reduce((acc, r) => {
       const reg = r.daily[day] || 0;
-      const duty = r.hasDuty ? (r.dutyDaily[day] || 0) : 0;
-      return acc + reg + duty;
+      return acc + reg;
     }, 0);
   });
 

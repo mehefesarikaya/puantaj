@@ -21,6 +21,7 @@ import {
   parseMonthlyPuantajExcel,
   exportMonthlyPuantajToExcel,
 } from '../../utils/excelPuantajUtils';
+import { syncTeacherScheduleToMonth } from '../../utils/schedulePuantajSync';
 import { ExcelPuantajImportRow } from '../../types';
 
 export const AdminReportsView: React.FC = () => {
@@ -28,11 +29,14 @@ export const AdminReportsView: React.FC = () => {
     schools,
     teachers,
     puantajRows,
+    weeklySchedules,
+    rules,
     selectedYear,
     selectedMonth,
     selectedSchoolId,
     setSelectedSchoolId,
     batchImportPuantajRows,
+    getTimesheetPeriod,
   } = useApp();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,12 +113,28 @@ export const AdminReportsView: React.FC = () => {
       (t) => t.isActive && (selectedSchoolId === 'all' || t.schoolId === selectedSchoolId)
     );
 
+    const currentPeriod = getTimesheetPeriod(selectedYear, selectedMonth);
+
     const exportData = activeTeachers.map((t) => {
       const r = puantajRows.find((p) => p.teacherId === t.id && p.year === selectedYear && p.month === selectedMonth);
+      const schedule = weeklySchedules.find((ws) => ws.teacherId === t.id);
+      const effectiveRow = schedule
+        ? syncTeacherScheduleToMonth({
+            teacher: t,
+            schedule,
+            year: selectedYear,
+            month: selectedMonth,
+            existingRow: r,
+            periodStartDate: currentPeriod?.startDate,
+            periodEndDate: currentPeriod?.endDate,
+            rules,
+          }).updatedRow
+        : r;
+
       return {
         teacher: t,
-        dailyHours: r ? r.dailyHours : {},
-        totalHours: r ? r.totalHours : 0,
+        dailyHours: effectiveRow ? effectiveRow.dailyHours : {},
+        totalHours: effectiveRow ? effectiveRow.totalHours : 0,
       };
     });
 

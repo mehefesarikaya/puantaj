@@ -18,12 +18,14 @@ import { useApp } from '../../context/AppContext';
 import { SubmissionStatus, Teacher } from '../../types';
 import { MONTH_NAMES_TR, getDaysInMonth } from '../../utils/excelPuantajUtils';
 import { formatTRY, calculateTeacherPayment } from '../../utils/paymentCalculator';
+import { syncTeacherScheduleToMonth } from '../../utils/schedulePuantajSync';
 
 export const MonthlyReviewView: React.FC = () => {
   const {
     schools,
     teachers,
     puantajRows,
+    weeklySchedules,
     submissions,
     rules,
     selectedYear,
@@ -32,6 +34,7 @@ export const MonthlyReviewView: React.FC = () => {
     setSelectedSchoolId,
     updateSubmissionStatus,
     maskSensitiveData,
+    getTimesheetPeriod,
   } = useApp();
 
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all');
@@ -227,8 +230,22 @@ export const MonthlyReviewView: React.FC = () => {
           const rowData = puantajRows.find(
             (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
           );
-          const daily = rowData ? rowData.dailyHours : {};
-          const totalActual = rowData ? rowData.totalHours : 0;
+          const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+          const currentPeriod = getTimesheetPeriod(selectedYear, selectedMonth);
+          const effectiveRow = schedule
+            ? syncTeacherScheduleToMonth({
+                teacher,
+                schedule,
+                year: selectedYear,
+                month: selectedMonth,
+                existingRow: rowData,
+                periodStartDate: currentPeriod.startDate,
+                periodEndDate: currentPeriod.endDate,
+                rules,
+              }).updatedRow
+            : rowData;
+          const daily = effectiveRow ? effectiveRow.dailyHours : {};
+          const totalActual = effectiveRow ? effectiveRow.totalHours : 0;
           const breakdown = calculateTeacherPayment(teacher, totalActual, rules);
 
           return (

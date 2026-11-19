@@ -103,7 +103,12 @@ interface AppContextType {
   saveWeeklySchedule: (schedule: TeacherWeeklySchedule) => Promise<void>;
   getTeacherSchedule: (teacherId: string) => TeacherWeeklySchedule | undefined;
   syncScheduleToTimesheet: (teacherId: string, year?: number, month?: number) => void;
-  syncAllSchedulesToTimesheet: (schoolId: string, year: number, month: number) => void;
+  syncAllSchedulesToTimesheet: (
+    schoolId: string,
+    year: number,
+    month: number,
+    silent?: boolean
+  ) => void;
   confirmAllPlannedForMonth: (schoolId: string, year: number, month: number) => void;
 
   // Puantaj actions
@@ -307,6 +312,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
   }, [currentUser, activeTab]);
+
+  // Kurum kullanıcısı için yönetici tarafından belirlenen aktif açık dönemi otomatik seç
+  useEffect(() => {
+    if (currentUser?.role === 'school_user' && activeTab !== 'history') {
+      const activeOpenPeriod = timesheetPeriods.find((p) => p.status === 'acik') || timesheetPeriods[0];
+      if (activeOpenPeriod) {
+        setSelectedYear(activeOpenPeriod.year);
+        setSelectedMonth(activeOpenPeriod.month);
+      }
+    }
+  }, [currentUser, activeTab, timesheetPeriods]);
 
   // Remote sync function for Supabase backend
   const syncFromRemote = async () => {
@@ -719,6 +735,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // Admin tarih aralığını güncellediğinde, onaylanmamış kurum puantajlarını yeni aralığa göre kontrollü güncelle
+    const rowsToUpdate: TeacherMonthlyPuantajRow[] = [];
+    setPuantajRows((prevRows) => {
+      const newRows = [...prevRows];
+
+      allTeachers.forEach((teacher) => {
+        const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+        if (!schedule) return;
+
+        const sub = submissions.find(
+          (s) => s.schoolId === teacher.schoolId && s.year === period.year && s.month === period.month
+        );
+        const isLocked = sub?.status === 'onaylandi' || sub?.status === 'gonderildi' || sub?.status === 'incelemede';
+        if (isLocked) return;
+
+        const existingRow = newRows.find(
+          (p) => p.teacherId === teacher.id && p.year === period.year && p.month === period.month
+        );
+
+        const syncResult = syncTeacherScheduleToMonth({
+          teacher,
+          schedule,
+          year: period.year,
+          month: period.month,
+          existingRow,
+          isSubmissionLocked: false,
+          periodStartDate: period.startDate,
+          periodEndDate: period.endDate,
+          rules,
+        });
+
+        const synced = syncResult.updatedRow;
+        rowsToUpdate.push(synced);
+
+        const rIdx = newRows.findIndex(
+          (p) => p.teacherId === teacher.id && p.year === period.year && p.month === period.month
+        );
+        if (rIdx >= 0) {
+          newRows[rIdx] = synced;
+        } else {
+          newRows.push(synced);
+        }
+      });
+
+      return newRows;
+    });
+
+    if (isSupabaseActive && rowsToUpdate.length > 0) {
+      try {
+        await supabaseDataService.batchUpsertPuantajRows(rowsToUpdate);
+      } catch (err) {
+        console.warn('Yeni tarih aralığı puantaj senkronizasyonu Supabase hatası:', err);
+      }
+    }
+
     logAction(
       'Puantaj Dönemi Ayarlandı',
       `${period.month}/${period.year} (${period.startDate} - ${period.endDate}, Durum: ${period.status})`
@@ -751,6 +822,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await supabaseDataService.saveTimesheetPeriod(updated);
       } catch (err) {
         console.warn('Supabase togglePeriodStatus hatası:', err);
+      }
+    }
+
+    // Dönem açıldığında (acik), haftalık ders programlarını bu dönemin puantaj cetveline senkronize et
+    if (newStatus === 'acik') {
+      const rowsToUpdate: TeacherMonthlyPuantajRow[] = [];
+      setPuantajRows((prevRows) => {
+        const newRows = [...prevRows];
+
+        allTeachers.forEach((teacher) => {
+          const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+          if (!schedule) return;
+
+          const sub = submissions.find(
+            (s) => s.schoolId === teacher.schoolId && s.year === year && s.month === month
+          );
+          const isLocked = sub?.status === 'onaylandi' || sub?.status === 'gonderildi' || sub?.status === 'incelemede';
+          if (isLocked) return;
+
+          const existingRow = newRows.find(
+            (p) => p.teacherId === teacher.id && p.year === year && p.month === month
+          );
+
+          const syncResult = syncTeacherScheduleToMonth({
+            teacher,
+            schedule,
+            year,
+            month,
+            existingRow,
+            isSubmissionLocked: false,
+            periodStartDate: updated.startDate,
+            periodEndDate: updated.endDate,
+            rules,
+          });
+
+          const synced = syncResult.updatedRow;
+          rowsToUpdate.push(synced);
+
+          const rIdx = newRows.findIndex(
+            (p) => p.teacherId === teacher.id && p.year === year && p.month === month
+          );
+          if (rIdx >= 0) {
+            newRows[rIdx] = synced;
+          } else {
+            newRows.push(synced);
+          }
+        });
+
+        return newRows;
+      });
+
+      if (isSupabaseActive && rowsToUpdate.length > 0) {
+        try {
+          await supabaseDataService.batchUpsertPuantajRows(rowsToUpdate);
+        } catch (err) {
+          console.warn('Dönem açılışı puantaj senkronizasyonu Supabase hatası:', err);
+        }
       }
     }
 
@@ -827,6 +955,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           daysInMonth,
           weeklyScheduleHours: schedule?.totalWeeklyHours,
           rules,
+          isAlreadyEkDers: true,
         });
 
         updatedRow = {
@@ -852,6 +981,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           daysInMonth,
           weeklyScheduleHours: schedule?.totalWeeklyHours,
           rules,
+          isAlreadyEkDers: true,
         });
 
         updatedRow = {
@@ -1392,10 +1522,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const syncAllSchedulesToTimesheet = (schoolId: string, year: number, month: number) => {
+  const syncAllSchedulesToTimesheet = (
+    schoolId: string,
+    year: number,
+    month: number,
+    silent: boolean = false
+  ) => {
     const period = getTimesheetPeriod(year, month);
     if (period.status === 'kapali' && currentUser?.role !== 'admin') {
-      alert('Bu ayın puantaj dönemi kapalı olduğu için ders programı senkronizasyonu yapılamaz.');
+      if (!silent) {
+        alert('Bu ayın puantaj dönemi kapalı olduğu için ders programı senkronizasyonu yapılamaz.');
+      }
       return;
     }
 
@@ -1406,7 +1543,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isLocked = sub?.status === 'onaylandi' || sub?.status === 'gonderildi' || sub?.status === 'incelemede';
 
     if (isLocked) {
-      alert('Bu ayın puantaj cetveli onaylanmış veya incelemede olduğu için senkronizasyon yapılamaz.');
+      if (!silent) {
+        alert('Bu ayın puantaj cetveli onaylanmış veya incelemede olduğu için senkronizasyon yapılamaz.');
+      }
       return;
     }
 
@@ -1417,6 +1556,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       schoolTeachers.forEach((teacher) => {
         const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+        if (!schedule) return;
+
         const existingRow = copy.find(
           (p) => p.teacherId === teacher.id && p.year === year && p.month === month
         );
@@ -1453,7 +1594,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       supabaseDataService.batchUpsertPuantajRows(updatedRowsList).catch(console.error);
     }
 
-    logAction('Tüm Programlar Puantaja Senkronize Edildi', `Kurum: ${schoolId}, Ay: ${month}/${year}`);
+    if (!silent) {
+      logAction('Tüm Programlar Puantaja Senkronize Edildi', `Kurum: ${schoolId}, Ay: ${month}/${year}`);
+    }
   };
 
   const confirmAllPlannedForMonth = (schoolId: string, year: number, month: number) => {

@@ -138,13 +138,18 @@ export const AdminMonthlyPuantajView: React.FC = () => {
       (p) => p.teacherId === teacher.id && p.year === selectedYear && p.month === selectedMonth
     );
     const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
-    const effectiveRow = rowData || (schedule ? syncTeacherScheduleToMonth({
-      teacher,
-      schedule,
-      year: selectedYear,
-      month: selectedMonth,
-      rules,
-    }).updatedRow : null);
+    const effectiveRow = schedule
+      ? syncTeacherScheduleToMonth({
+          teacher,
+          schedule,
+          year: selectedYear,
+          month: selectedMonth,
+          existingRow: rowData,
+          periodStartDate: currentPeriod.startDate,
+          periodEndDate: currentPeriod.endDate,
+          rules,
+        }).updatedRow
+      : rowData;
 
     const daily = effectiveRow ? effectiveRow.dailyHours : {};
     const statuses = effectiveRow ? effectiveRow.dailyStatuses || {} : {};
@@ -178,18 +183,17 @@ export const AdminMonthlyPuantajView: React.FC = () => {
     };
   });
 
-  // Grand totals including both regular and duty hours
-  const grandTotalActual = tableRows.reduce((acc, r) => acc + r.total + (r.hasDuty ? r.dutyTotal : 0), 0);
+  // Grand totals
+  const grandTotalActual = tableRows.reduce((acc, r) => acc + r.total, 0);
   const grandTotalBonus = tableRows.reduce((acc, r) => acc + r.bonus, 0);
-  const grandTotalPayable = tableRows.reduce((acc, r) => acc + r.payable + (r.hasDuty ? r.dutyTotal : 0), 0);
-  const grandTotalPayment = tableRows.reduce((acc, r) => acc + r.payment + (r.hasDuty ? r.dutyPayment : 0), 0);
+  const grandTotalPayable = tableRows.reduce((acc, r) => acc + r.payable, 0);
+  const grandTotalPayment = tableRows.reduce((acc, r) => acc + r.payment, 0);
 
-  // Column totals for each day (combining regular + duty)
+  // Column totals for each day
   const dailyColumnTotals = daysMetadata.map(({ day }) => {
     return tableRows.reduce((acc, r) => {
       const reg = r.daily[day] || 0;
-      const duty = r.hasDuty ? (r.dutyDaily[day] || 0) : 0;
-      return acc + reg + duty;
+      return acc + reg;
     }, 0);
   });
 

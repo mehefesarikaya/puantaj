@@ -319,11 +319,25 @@ export function syncTeacherScheduleToMonth(params: {
   const daysInMonth = getDaysInMonthCount(year, month);
   const currentDailyHours: Record<number, number | null> = existingRow?.dailyHours ? { ...existingRow.dailyHours } : {};
   const currentStatuses: Record<number, TimesheetCellStatus> = existingRow?.dailyStatuses ? { ...existingRow.dailyStatuses } : {};
+  const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
+
+  // 2. MEB Günlük Maaş Karşılığı ve Ek Ders Dağılım Çizelgesini Hesapla
+  const weeklyMebBreakdown = calculateWeeklyDailyMebBreakdown({ teacher, schedule, rules });
 
   let modifiedDaysCount = 0;
+  const maasDailyHours: Record<number, number | null> = {};
+  const excessDailyHours: Record<number, number | null> = {};
+  const prepDailyHours: Record<number, number | null> = {};
+  const guidanceDailyHours: Record<number, number | null> = {};
+  const dutyDailyHours: Record<number, number | null> = {};
+  const dutyDailyStatuses: Record<number, TimesheetCellStatus> = {};
 
   for (let day = 1; day <= daysInMonth; day++) {
     const status = currentStatuses[day];
+    const dateStr = formatDateString(year, month, day);
+    // Saat dilimi ve yaz/kış saati kaynaklı gün kaymasını önlemek için öğle saatini (12:00) kullan
+    const dateObj = new Date(year, month - 1, day, 12, 0, 0);
+    const dow = getScheduleDayOfWeek(dateObj.getDay());
 
     // Fiili olarak onaylanmış ('confirmed'), elle girilmiş ('manual') veya izinli/raporlu günler KORUNUR!
     const isProtected =
@@ -336,18 +350,46 @@ export function syncTeacherScheduleToMonth(params: {
       continue;
     }
 
-    const dateStr = formatDateString(year, month, day);
-    const isOutsidePeriod =
-      (periodStartDate && dateStr < periodStartDate) ||
-      (periodEndDate && dateStr > periodEndDate);
-
-    if (isOutsidePeriod) {
-      // Yönetici tarafından belirlenen dönem dışındaki planlanan saatleri temizle
+    // Hafta sonlarına (Cumartesi=6, Pazar=7) puantaj aktarımı yapılmaz
+    const isWeekend = dow === 6 || dow === 7;
+    if (isWeekend) {
       if (currentStatuses[day] === 'planned') {
         currentDailyHours[day] = null;
         delete currentStatuses[day];
         modifiedDaysCount++;
       }
+      maasDailyHours[day] = null;
+      excessDailyHours[day] = null;
+      prepDailyHours[day] = null;
+      guidanceDailyHours[day] = null;
+      dutyDailyHours[day] = null;
+      continue;
+    }
+
+    // Admin tarafından belirlenen aktif tarih aralığı sınırları (belirtilmemişse ayın 1'i ve son günü)
+    const effectivePeriodStart = periodStartDate || `${year}-${String(month).padStart(2, '0')}-01`;
+    const daysInMonthCount = getDaysInMonthCount(year, month);
+    const effectivePeriodEnd = periodEndDate || `${year}-${String(month).padStart(2, '0')}-${String(daysInMonthCount).padStart(2, '0')}`;
+
+    const isOutsidePeriod =
+      Boolean(dateStr < effectivePeriodStart) ||
+      Boolean(dateStr > effectivePeriodEnd);
+
+    const isOutsideTeacherActive =
+      Boolean(teacher.startDate && dateStr < teacher.startDate) ||
+      Boolean(teacher.departureDate && dateStr > teacher.departureDate);
+
+    if (isOutsidePeriod || isOutsideTeacherActive) {
+      if (currentStatuses[day] === 'planned') {
+        currentDailyHours[day] = null;
+        delete currentStatuses[day];
+        modifiedDaysCount++;
+      }
+      maasDailyHours[day] = null;
+      excessDailyHours[day] = null;
+      prepDailyHours[day] = null;
+      guidanceDailyHours[day] = null;
+      dutyDailyHours[day] = null;
       continue;
     }
 
@@ -359,20 +401,41 @@ export function syncTeacherScheduleToMonth(params: {
         currentStatuses[day] = 'tatil';
         modifiedDaysCount++;
       }
+      maasDailyHours[day] = null;
+      excessDailyHours[day] = null;
+      prepDailyHours[day] = null;
+      guidanceDailyHours[day] = null;
+      dutyDailyHours[day] = null;
       continue;
     }
 
-    // Programdan planlanan ders saatini al
-    const plannedHours = getPlannedHoursForDate(schedule, year, month, day);
+    // MEB Dağılım Çizelgesindeki "Toplam Ek Ders" Sütunundaki Nihai Değeri Al
+    const breakdownItem = weeklyMebBreakdown.dailyBreakdown[dow];
+    let plannedEkDers = breakdownItem?.totalDailyAdditionalHours || 0;
 
-    if (plannedHours > 0) {
-      if (currentDailyHours[day] !== plannedHours || currentStatuses[day] !== 'planned') {
-        currentDailyHours[day] = plannedHours;
+    // Yarım gün resmî tatilde (örn. 28 Ekim) öğleden önce yapılan ek dersler verilir
+    if (holiday.isHoliday && holiday.isHalfDay) {
+      plannedEkDers = Math.ceil(plannedEkDers / 2);
+    }
+
+    if (plannedEkDers > 0) {
+      if (currentDailyHours[day] !== plannedEkDers || currentStatuses[day] !== 'planned') {
+        currentDailyHours[day] = plannedEkDers;
         currentStatuses[day] = 'planned';
         modifiedDaysCount++;
       }
+
+      maasDailyHours[day] = breakdownItem?.maasKarsiligiHours || 0;
+      excessDailyHours[day] = breakdownItem?.excessLessonHours || 0;
+      prepDailyHours[day] = breakdownItem?.prepPlanningHours || 0;
+      guidanceDailyHours[day] = breakdownItem?.guidanceHours || 0;
+      if (breakdownItem?.dutyHours) {
+        dutyDailyHours[day] = breakdownItem.dutyHours;
+        dutyDailyStatuses[day] = 'planned';
+      } else {
+        dutyDailyHours[day] = null;
+      }
     } else {
-      // Eğer daha önce programdan aktarılmış bir 'planned' değer veya korumasız boş/eski saat varsa temizle
       if (currentStatuses[day] === 'planned' || !status) {
         if (currentDailyHours[day] !== null || currentStatuses[day] !== undefined) {
           currentDailyHours[day] = null;
@@ -380,76 +443,31 @@ export function syncTeacherScheduleToMonth(params: {
           modifiedDaysCount++;
         }
       }
-    }
-  }
-
-  // Toplam ders saati, statü bazlı maaş karşılığı / 5'e 1 ve tahakkuk hesabı
-  const totalHours = Object.values(currentDailyHours).reduce(
-    (sum: number, h) => sum + (h || 0),
-    0
-  );
-  const totals = calculateMonthlyPuantajTotals({
-    teacher,
-    totalHours,
-    daysInMonth,
-    weeklyScheduleHours: schedule?.totalWeeklyHours,
-    rules,
-  });
-  const bonusFiveToOneHours = totals.bonusFiveToOneHours;
-  const payableTotalHours = totals.payableTotalHours;
-  const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
-  const estimatedPayment = totals.estimatedPayment;
-
-  // MEB Mevzuatı (Madde 23, Maaş Karşılığı, Ek Ders, Rehberlik) Günlük Dağılımını Hesapla
-  const weeklyMebBreakdown = calculateWeeklyDailyMebBreakdown({ teacher, schedule, rules });
-  const maasDailyHours: Record<number, number | null> = {};
-  const excessDailyHours: Record<number, number | null> = {};
-  const prepDailyHours: Record<number, number | null> = {};
-  const guidanceDailyHours: Record<number, number | null> = {};
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const planned = currentDailyHours[day];
-    const status = currentStatuses[day];
-    const isHoliday = status === 'tatil';
-    const dateObj = new Date(year, month - 1, day);
-    const dow = getScheduleDayOfWeek(dateObj.getDay());
-
-    if (planned !== null && planned !== undefined && planned > 0 && !isHoliday) {
-      const breakdownItem = weeklyMebBreakdown.dailyBreakdown[dow];
-      if (teacher.employmentType === 'sozlesmeli') {
-        maasDailyHours[day] = breakdownItem?.maasKarsiligiHours || 0;
-        excessDailyHours[day] = breakdownItem?.excessLessonHours || 0;
-      } else {
-        maasDailyHours[day] = 0;
-        excessDailyHours[day] = planned;
-      }
-      prepDailyHours[day] = breakdownItem?.prepPlanningHours || 0;
-      guidanceDailyHours[day] = breakdownItem?.guidanceHours || 0;
-    } else {
       maasDailyHours[day] = null;
       excessDailyHours[day] = null;
       prepDailyHours[day] = null;
       guidanceDailyHours[day] = null;
+      dutyDailyHours[day] = null;
     }
   }
+
+  // Toplam saat: Puantaj cetvelindeki hücreler doğrudan "Toplam Ek Ders" olduğundan:
+  const totalHours = Object.values(currentDailyHours).reduce(
+    (sum: number, h) => sum + (h || 0),
+    0
+  );
 
   const monthlyMaasHours = Object.values(maasDailyHours).reduce((a: number, b) => a + (b || 0), 0);
   const monthlyExcessHours = Object.values(excessDailyHours).reduce((a: number, b) => a + (b || 0), 0);
   const monthlyPrepHours = Object.values(prepDailyHours).reduce((a: number, b) => a + (b || 0), 0);
   const monthlyGuidanceHours = Object.values(guidanceDailyHours).reduce((a: number, b) => a + (b || 0), 0);
+  const dutyTotalHours = Object.values(dutyDailyHours).reduce((a: number, b) => a + (b || 0), 0);
+  const dutyEstimatedPayment = Math.round(dutyTotalHours * hourlyRate * 100) / 100;
 
-  // Nöbet görevi saatlerini senkronize et
-  const dutyResult = syncTeacherDutyHours({
-    teacher,
-    year,
-    month,
-    existingDutyHours: existingRow?.dutyDailyHours,
-    existingDutyStatuses: existingRow?.dutyDailyStatuses,
-    isSubmissionLocked,
-    periodStartDate,
-    periodEndDate,
-    hourlyRate,
-  });
+  // Puantaj raporundaki ödenecek saat, çizelgedeki toplam ek derstir
+  const payableTotalHours = totalHours;
+  const bonusFiveToOneHours = monthlyPrepHours + monthlyGuidanceHours;
+  const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;
 
   const updatedRow: TeacherMonthlyPuantajRow = {
     teacherId: teacher.id,
@@ -462,10 +480,10 @@ export function syncTeacherScheduleToMonth(params: {
     bonusFiveToOneHours,
     payableTotalHours,
     estimatedPayment,
-    dutyDailyHours: dutyResult.dutyDailyHours,
-    dutyDailyStatuses: dutyResult.dutyDailyStatuses,
-    dutyTotalHours: dutyResult.dutyTotalHours,
-    dutyEstimatedPayment: dutyResult.dutyEstimatedPayment,
+    dutyDailyHours,
+    dutyDailyStatuses,
+    dutyTotalHours,
+    dutyEstimatedPayment,
     maasDailyHours,
     excessDailyHours,
     prepDailyHours,

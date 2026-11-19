@@ -32,9 +32,11 @@ export const SchoolDashboardView: React.FC = () => {
     currentUser,
     setActiveTab,
     submitPuantajToAdmin,
+    getTimesheetPeriod,
   } = useApp();
 
   const monthName = MONTH_NAMES_TR[selectedMonth] || '';
+  const currentPeriod = getTimesheetPeriod(selectedYear, selectedMonth);
 
   // Get active school of this logged in school user
   const school = schools.find((s) => s.id === currentUser?.schoolId) || schools[0];
@@ -243,13 +245,18 @@ export const SchoolDashboardView: React.FC = () => {
               {schoolTeachers.map((teacher) => {
                 const row = schoolPuantaj.find((p) => p.teacherId === teacher.id);
                 const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
-                const effectiveRow = row || (schedule ? syncTeacherScheduleToMonth({
-                  teacher,
-                  schedule,
-                  year: selectedYear,
-                  month: selectedMonth,
-                  rules,
-                }).updatedRow : null);
+                const effectiveRow = schedule
+                  ? syncTeacherScheduleToMonth({
+                      teacher,
+                      schedule,
+                      year: selectedYear,
+                      month: selectedMonth,
+                      existingRow: row,
+                      periodStartDate: currentPeriod.startDate,
+                      periodEndDate: currentPeriod.endDate,
+                      rules,
+                    }).updatedRow
+                  : row;
 
                 const actual = effectiveRow ? effectiveRow.totalHours : 0;
                 const bonus = effectiveRow ? effectiveRow.bonusFiveToOneHours : 0;

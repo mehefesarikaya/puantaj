@@ -383,9 +383,20 @@ export function calculateMonthlyPuantajTotals(params: {
   daysInMonth: number;
   weeklyScheduleHours?: number;
   rules: MebPaymentRules;
+  isAlreadyEkDers?: boolean;
 }): MonthlyPuantajTotals {
-  const { teacher, totalHours, daysInMonth, weeklyScheduleHours, rules } = params;
+  const { teacher, totalHours, daysInMonth, weeklyScheduleHours, rules, isAlreadyEkDers } = params;
   const hourlyRate = teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
+
+  // MEB Günlük Çizelgesinden aktarılan Toplam Ek Ders değerleri için ek düşüm yapılmaz
+  if (isAlreadyEkDers) {
+    return {
+      totalHours,
+      bonusFiveToOneHours: 0,
+      payableTotalHours: totalHours,
+      estimatedPayment: Math.round(totalHours * hourlyRate * 100) / 100,
+    };
+  }
 
   // 1. SÖZLEŞMELİ: Maaş karşılığı düşümü SADECE sözleşmeli öğretmenlere uygulanır
   if (teacher.employmentType === 'sozlesmeli') {
