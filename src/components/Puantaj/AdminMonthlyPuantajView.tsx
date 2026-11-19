@@ -537,7 +537,7 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                tableRows.map(({ teacher, daily, statuses, total, bonus, payable, payment, hasDuty, dutyDaily, dutyStatuses, dutyTotal, dutyPayment }) => (
+                tableRows.map(({ teacher, rowData, daily, statuses, total, bonus, payable, payment, hasDuty, dutyDaily, dutyStatuses, dutyTotal, dutyPayment }) => (
                   <React.Fragment key={teacher.id}>
                     {/* 1. REGULAR LESSONS ROW */}
                     <tr className="hover:bg-blue-50/40 dark:hover:bg-slate-750 transition-colors group">
@@ -568,6 +568,9 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                         const cellStatus = statuses[day] || (val !== null && val !== undefined && val > 0 ? 'confirmed' : undefined);
                         const isPlanned = cellStatus === 'planned';
                         const isEditing = editingCell?.teacherId === teacher.id && editingCell?.day === day && !editingCell?.isDuty;
+                        const maasVal = rowData?.maasDailyHours?.[day];
+                        const excessVal = rowData?.excessDailyHours?.[day];
+                        const prepVal = rowData?.prepDailyHours?.[day];
 
                         return (
                           <td
@@ -584,6 +587,8 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                                 ? isPlanned
                                   ? 'bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-b-2 border-b-blue-400'
                                   : 'bg-emerald-50/40 dark:bg-emerald-950/20 text-slate-900 dark:text-white font-extrabold'
+                                : cellStatus === 'tatil'
+                                ? 'bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-[10px]'
                                 : val === 0
                                 ? 'text-slate-400 bg-slate-50'
                                 : 'text-transparent hover:text-slate-300'
@@ -591,8 +596,12 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                             title={
                               !isWithinPeriod
                                 ? `Dönem dışı tarih (${dateStr})`
-                                : isPlanned
-                                ? `Planlanan Ders Saati (${teacher.fullName} - Gün ${day})`
+                                : cellStatus === 'tatil'
+                                ? `Resmî Tatil (${dateStr})`
+                                : val !== null && val !== undefined && val > 0
+                                ? teacher.employmentType === 'sozlesmeli' && maasVal !== undefined && excessVal !== undefined
+                                  ? `${teacher.fullName} (Gün ${day}): ${val} Saat (${maasVal} Sa Maaş + ${excessVal} Sa Ek Ders${prepVal ? ` + ${prepVal} Sa H/P` : ''})`
+                                  : `Ders Saati: ${val} Saat (${teacher.fullName} - Gün ${day})`
                                 : `Düzenle: ${teacher.fullName} - Gün ${day}`
                             }
                           >
@@ -609,6 +618,8 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                                 }}
                                 className="w-full text-center py-0.5 font-bold font-mono text-xs rounded bg-blue-600 text-white outline-none"
                               />
+                            ) : cellStatus === 'tatil' ? (
+                              <span className="text-[8px] font-bold text-rose-500 uppercase tracking-tighter">TATİL</span>
                             ) : val !== null && val !== undefined ? (
                               <div>
                                 <span>{val}</span>

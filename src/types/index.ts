@@ -164,13 +164,22 @@ export interface TeacherMonthlyPuantajRow {
   dailyHours: Record<number, number | null>; // day (1..31) -> hours
   dailyStatuses?: Record<number, TimesheetCellStatus>; // day (1..31) -> status ('planned' | 'confirmed' | 'manual' vb.)
   totalHours: number;
-  bonusFiveToOneHours: number; // Her 5 saate 1 saat ek
+  bonusFiveToOneHours: number; // Her 5 saate 1 saat ek / hazırlık ve rehberlik ekleri
   payableTotalHours: number;
   estimatedPayment: number;
   dutyDailyHours?: Record<number, number | null>; // Nöbet görevi günlük saatleri (3 saat)
   dutyDailyStatuses?: Record<number, TimesheetCellStatus>; // Nöbet görevi hücre durumları ('planned' | 'confirmed')
   dutyTotalHours?: number; // Aylık toplam nöbet saati
   dutyEstimatedPayment?: number; // Nöbet görevi aylık tahakkuk tutarı
+  // MEB Mevzuatı Günlük ve Aylık Ayrıntılı Dağılım Kalemleri
+  maasDailyHours?: Record<number, number | null>; // Günlük maaş karşılığı saatleri
+  excessDailyHours?: Record<number, number | null>; // Günlük maaş üstü ek ders saatleri
+  prepDailyHours?: Record<number, number | null>; // Günlük hazırlık ve planlama saatleri (Madde 23)
+  guidanceDailyHours?: Record<number, number | null>; // Günlük rehberlik saatleri (Madde 23)
+  monthlyMaasHours?: number; // Aylık toplam maaş karşılığı
+  monthlyExcessHours?: number; // Aylık toplam maaş üstü ek ders
+  monthlyPrepHours?: number; // Aylık toplam hazırlık ve planlama
+  monthlyGuidanceHours?: number; // Aylık toplam sınıf rehberliği
 }
 
 export interface SchoolMonthlySubmission {

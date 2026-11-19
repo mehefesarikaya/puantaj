@@ -238,6 +238,128 @@ export function calculateMonthlyTeacherPayment(
   };
 }
 
+export interface DailyMebScheduleBreakdown {
+  dayOfWeek: number; // 1: Pzt ... 5: Cum, 6: Cmt, 7: Paz
+  dayName: string;
+  actualLessonHours: number; // Fiili okutulan normal ders
+  maasKarsiligiHours: number; // Maaş karşılığı sayılan kısım
+  excessLessonHours: number; // Gündüz ek dersi (maaş üstü)
+  prepPlanningHours: number; // Hazırlık ve planlama (10'a 1, Madde 23)
+  guidanceHours: number; // Sınıf rehberliği (Madde 6, Madde 23)
+  dutyHours: number; // Nöbet görevi (varsa o güne 3 saat)
+  specialActivityHours: number; // DYK, destek vb.
+  totalDailyAdditionalHours: number; // O güne tahakkuk eden toplam ek ders
+}
+
+export interface WeeklyMebScheduleBreakdownResult {
+  dailyBreakdown: Record<number, DailyMebScheduleBreakdown>;
+  weeklyNormalLessons: number;
+  weeklySpecialLessons: number;
+  weeklyTotalLessons: number;
+  weeklyMaasKarsiligi: number;
+  weeklyExcessLessons: number;
+  weeklyPrepPlanning: number;
+  weeklyGuidance: number;
+  weeklyDuty: number;
+  weeklyTotalAdditionalHours: number;
+}
+
+/**
+ * Haftalık ders programını MEB mevzuatına uygun olarak gün gün
+ * Maaş Karşılığı, Ek Ders, Hazırlık-Planlama (Madde 23) ve Rehberlik olarak ayrıştırır.
+ */
+export function calculateWeeklyDailyMebBreakdown(params: {
+  teacher: Teacher;
+  schedule: TeacherWeeklySchedule | null | undefined;
+  rules: MebPaymentRules;
+}): WeeklyMebScheduleBreakdownResult {
+  const { teacher, schedule, rules } = params;
+  const isSozlesmeli = teacher.employmentType === 'sozlesmeli';
+  const category = teacher.branchCategory || inferBranchCategory(teacher.branch);
+  const config = BRANCH_CATEGORY_CONFIGS[category] || BRANCH_CATEGORY_CONFIGS.genel_bilgi_ve_brans;
+
+  const weeklyCalc = calculateWeeklyAdditionalTeaching(teacher, schedule, rules);
+  const totalMaasQuota = isSozlesmeli ? config.maasKarsiligiHours : 0;
+  let remainingMaasQuota = totalMaasQuota;
+
+  const prepDistribution = distributeWeeklyHoursAccordingToMebArticle23(weeklyCalc.preparationPlanningHours);
+  const guidanceDistribution = distributeWeeklyHoursAccordingToMebArticle23(weeklyCalc.classGuidanceHours);
+
+  const dayNames: Record<number, string> = {
+    1: 'Pazartesi',
+    2: 'Salı',
+    3: 'Çarşamba',
+    4: 'Perşembe',
+    5: 'Cuma',
+    6: 'Cumartesi',
+    7: 'Pazar',
+  };
+
+  const dailyBreakdown: Record<number, DailyMebScheduleBreakdown> = {};
+  const lessons = schedule?.lessons || [];
+
+  for (let d = 1; d <= 7; d++) {
+    const dayLessons = lessons.filter((l) => l.dayOfWeek === d);
+    const normalLessons = dayLessons
+      .filter((l) => l.lessonType === 'normal' || !l.lessonType)
+      .reduce((sum, l) => sum + (Number(l.lessonCount) || 0), 0);
+    const specialLessons = dayLessons
+      .filter((l) => l.lessonType && l.lessonType !== 'normal')
+      .reduce((sum, l) => sum + (Number(l.lessonCount) || 0), 0);
+
+    let maasForDay = 0;
+    let excessForDay = normalLessons;
+
+    if (isSozlesmeli && normalLessons > 0 && remainingMaasQuota > 0) {
+      maasForDay = Math.min(normalLessons, remainingMaasQuota);
+      remainingMaasQuota -= maasForDay;
+      excessForDay = normalLessons - maasForDay;
+    } else if (isSozlesmeli && remainingMaasQuota === 0) {
+      maasForDay = 0;
+      excessForDay = normalLessons;
+    }
+
+    const prepDayHours = prepDistribution[d] || 0;
+    const guidanceDayHours = guidanceDistribution[d] || 0;
+    const dutyDayHours =
+      teacher.hasGuardDuty && teacher.guardDutyDay === d ? rules.nobetHoursPerWeek || 3 : 0;
+
+    const totalDailyAdditionalHours =
+      excessForDay + prepDayHours + guidanceDayHours + dutyDayHours + specialLessons;
+
+    dailyBreakdown[d] = {
+      dayOfWeek: d,
+      dayName: dayNames[d],
+      actualLessonHours: normalLessons,
+      maasKarsiligiHours: maasForDay,
+      excessLessonHours: excessForDay,
+      prepPlanningHours: prepDayHours,
+      guidanceHours: guidanceDayHours,
+      dutyHours: dutyDayHours,
+      specialActivityHours: specialLessons,
+      totalDailyAdditionalHours,
+    };
+  }
+
+  const weeklyNormalLessons = Object.values(dailyBreakdown).reduce((s, d) => s + d.actualLessonHours, 0);
+  const weeklySpecialLessons = Object.values(dailyBreakdown).reduce((s, d) => s + d.specialActivityHours, 0);
+  const weeklyMaasKarsiligi = Object.values(dailyBreakdown).reduce((s, d) => s + d.maasKarsiligiHours, 0);
+  const weeklyExcessLessons = Object.values(dailyBreakdown).reduce((s, d) => s + d.excessLessonHours, 0);
+
+  return {
+    dailyBreakdown,
+    weeklyNormalLessons,
+    weeklySpecialLessons,
+    weeklyTotalLessons: weeklyNormalLessons + weeklySpecialLessons,
+    weeklyMaasKarsiligi,
+    weeklyExcessLessons,
+    weeklyPrepPlanning: weeklyCalc.preparationPlanningHours,
+    weeklyGuidance: weeklyCalc.classGuidanceHours,
+    weeklyDuty: weeklyCalc.guardDutyHours,
+    weeklyTotalAdditionalHours: weeklyCalc.weeklyAdditionalHours,
+  };
+}
+
 export interface MonthlyPuantajTotals {
   totalHours: number;
   bonusFiveToOneHours: number;

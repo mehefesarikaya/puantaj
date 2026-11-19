@@ -132,41 +132,72 @@ export const mapSubmissionToDb = (sub: SchoolMonthlySubmission) => ({
   updated_at: new Date().toISOString(),
 });
 
-export const mapPuantajFromDb = (row: any): TeacherMonthlyPuantajRow => ({
-  teacherId: row.teacher_id,
-  schoolId: row.school_id,
-  year: row.year,
-  month: row.month,
-  dailyHours: (row.daily_hours as Record<number, number | null>) || {},
-  dailyStatuses: (row.daily_statuses as Record<number, any>) || {},
-  totalHours: Number(row.total_hours || 0),
-  bonusFiveToOneHours: Number(row.bonus_five_to_one_hours || 0),
-  payableTotalHours: Number(row.payable_total_hours || 0),
-  estimatedPayment: Number(row.estimated_payment || 0),
-  dutyDailyHours: (row.duty_daily_hours as Record<number, number | null>) || {},
-  dutyDailyStatuses: (row.duty_daily_statuses as Record<number, any>) || {},
-  dutyTotalHours: Number(row.duty_total_hours || 0),
-  dutyEstimatedPayment: Number(row.duty_estimated_payment || 0),
-});
+export const mapPuantajFromDb = (row: any): TeacherMonthlyPuantajRow => {
+  const rawStatuses = (row.daily_statuses as Record<string, any>) || {};
+  const dailyStatuses: Record<number, any> = {};
 
-export const mapPuantajToDb = (row: TeacherMonthlyPuantajRow) => ({
-  id: `${row.teacherId}-${row.year}-${row.month}`,
-  teacher_id: row.teacherId,
-  school_id: row.schoolId,
-  year: row.year,
-  month: row.month,
-  daily_hours: row.dailyHours,
-  daily_statuses: row.dailyStatuses || {},
-  total_hours: row.totalHours,
-  bonus_five_to_one_hours: row.bonusFiveToOneHours,
-  payable_total_hours: row.payableTotalHours,
-  estimated_payment: row.estimatedPayment,
-  duty_daily_hours: row.dutyDailyHours || {},
-  duty_daily_statuses: row.dutyDailyStatuses || {},
-  duty_total_hours: row.dutyTotalHours || 0,
-  duty_estimated_payment: row.dutyEstimatedPayment || 0,
-  updated_at: new Date().toISOString(),
-});
+  Object.keys(rawStatuses).forEach((k) => {
+    if (!k.startsWith('_')) {
+      dailyStatuses[Number(k)] = rawStatuses[k];
+    }
+  });
+
+  return {
+    teacherId: row.teacher_id,
+    schoolId: row.school_id,
+    year: row.year,
+    month: row.month,
+    dailyHours: (row.daily_hours as Record<number, number | null>) || {},
+    dailyStatuses,
+    totalHours: Number(row.total_hours || 0),
+    bonusFiveToOneHours: Number(row.bonus_five_to_one_hours || 0),
+    payableTotalHours: Number(row.payable_total_hours || 0),
+    estimatedPayment: Number(row.estimated_payment || 0),
+    dutyDailyHours: (row.duty_daily_hours as Record<number, number | null>) || {},
+    dutyDailyStatuses: (row.duty_daily_statuses as Record<number, any>) || {},
+    dutyTotalHours: Number(row.duty_total_hours || 0),
+    dutyEstimatedPayment: Number(row.duty_estimated_payment || 0),
+    maasDailyHours: rawStatuses._maasDaily,
+    excessDailyHours: rawStatuses._excessDaily,
+    prepDailyHours: rawStatuses._prepDaily,
+    guidanceDailyHours: rawStatuses._guidanceDaily,
+    monthlyMaasHours: rawStatuses._monthlyMaas,
+    monthlyExcessHours: rawStatuses._monthlyExcess,
+    monthlyPrepHours: rawStatuses._monthlyPrep,
+    monthlyGuidanceHours: rawStatuses._monthlyGuidance,
+  };
+};
+
+export const mapPuantajToDb = (row: TeacherMonthlyPuantajRow) => {
+  const metaStatuses: Record<string, any> = { ...(row.dailyStatuses || {}) };
+  if (row.maasDailyHours) metaStatuses._maasDaily = row.maasDailyHours;
+  if (row.excessDailyHours) metaStatuses._excessDaily = row.excessDailyHours;
+  if (row.prepDailyHours) metaStatuses._prepDaily = row.prepDailyHours;
+  if (row.guidanceDailyHours) metaStatuses._guidanceDaily = row.guidanceDailyHours;
+  if (row.monthlyMaasHours !== undefined) metaStatuses._monthlyMaas = row.monthlyMaasHours;
+  if (row.monthlyExcessHours !== undefined) metaStatuses._monthlyExcess = row.monthlyExcessHours;
+  if (row.monthlyPrepHours !== undefined) metaStatuses._monthlyPrep = row.monthlyPrepHours;
+  if (row.monthlyGuidanceHours !== undefined) metaStatuses._monthlyGuidance = row.monthlyGuidanceHours;
+
+  return {
+    id: `${row.teacherId}-${row.year}-${row.month}`,
+    teacher_id: row.teacherId,
+    school_id: row.schoolId,
+    year: row.year,
+    month: row.month,
+    daily_hours: row.dailyHours,
+    daily_statuses: metaStatuses,
+    total_hours: row.totalHours,
+    bonus_five_to_one_hours: row.bonusFiveToOneHours,
+    payable_total_hours: row.payableTotalHours,
+    estimated_payment: row.estimatedPayment,
+    duty_daily_hours: row.dutyDailyHours || {},
+    duty_daily_statuses: row.dutyDailyStatuses || {},
+    duty_total_hours: row.dutyTotalHours || 0,
+    duty_estimated_payment: row.dutyEstimatedPayment || 0,
+    updated_at: new Date().toISOString(),
+  };
+};
 
 export const mapPeriodFromDb = (row: any): TimesheetPeriod => ({
   id: row.id,

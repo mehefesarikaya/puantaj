@@ -22,6 +22,7 @@ import { useApp } from '../../context/AppContext';
 import {
   calculateWeeklyAdditionalTeaching,
   calculateEffectiveHourlyRate,
+  calculateWeeklyDailyMebBreakdown,
 } from '../../utils/additionalTeachingCalculator';
 import { formatTRY } from '../../utils/paymentCalculator';
 
@@ -97,6 +98,10 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
 
   const calculation = useMemo(() => {
     return calculateWeeklyAdditionalTeaching(teacher, mockSchedule, rules);
+  }, [teacher, mockSchedule, rules]);
+
+  const dailyMebBreakdown = useMemo(() => {
+    return calculateWeeklyDailyMebBreakdown({ teacher, schedule: mockSchedule, rules });
   }, [teacher, mockSchedule, rules]);
 
   const rateInfo = useMemo(() => {
@@ -238,6 +243,11 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                           Günlük: {dayTotal} Saat
                         </span>
+                        {teacher.employmentType === 'sozlesmeli' && day.id <= 5 && dayTotal > 0 && (
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                            ({dailyMebBreakdown.dailyBreakdown[day.id]?.maasKarsiligiHours || 0} Sa Maaş + {dailyMebBreakdown.dailyBreakdown[day.id]?.excessLessonHours || 0} Sa Ek Ders)
+                          </span>
+                        )}
                         {day.id <= 5 && (calculation.article23Distribution?.[day.id] || 0) > 0 && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                             +{calculation.article23Distribution?.[day.id]} Saat Madde 23
@@ -335,6 +345,62 @@ export const TeacherWeeklyScheduleModal: React.FC<TeacherWeeklyScheduleModalProp
                   </div>
                 );
               })}
+            </div>
+
+            {/* MEB Günlük Maaş Karşılığı & Ek Ders Dağılım Çizelgesi */}
+            <div className="mt-4 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 overflow-hidden">
+              <span className="text-xs font-bold text-slate-900 dark:text-white block mb-2">
+                MEB Günlük Maaş Karşılığı ve Ek Ders Dağılım Çizelgesi
+              </span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-center text-[11px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold">
+                      <th className="py-1 px-2 text-left">Gün</th>
+                      <th className="py-1 px-1">Fiili Ders</th>
+                      <th className="py-1 px-1">Maaş Karşılığı</th>
+                      <th className="py-1 px-1">Gündüz Ek Ders</th>
+                      <th className="py-1 px-1">Hazırlık (Mad. 23)</th>
+                      <th className="py-1 px-1">Rehberlik (Mad. 23)</th>
+                      <th className="py-1 px-1">Nöbet</th>
+                      <th className="py-1 px-1 font-bold text-blue-600 dark:text-blue-400">Toplam Ek Ders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-750 font-mono">
+                    {[1, 2, 3, 4, 5].map((d) => {
+                      const item = dailyMebBreakdown.dailyBreakdown[d];
+                      return (
+                        <tr key={d} className="hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
+                          <td className="py-1 px-2 text-left font-sans font-medium text-slate-700 dark:text-slate-300">
+                            {item?.dayName}
+                          </td>
+                          <td className="py-1 px-1 font-bold">{item?.actualLessonHours || 0}</td>
+                          <td className="py-1 px-1 text-slate-600 dark:text-slate-400">{item?.maasKarsiligiHours || 0}</td>
+                          <td className="py-1 px-1 text-indigo-600 font-bold">{item?.excessLessonHours || 0}</td>
+                          <td className="py-1 px-1 text-emerald-600">{item?.prepPlanningHours ? `+${item.prepPlanningHours}` : '-'}</td>
+                          <td className="py-1 px-1 text-emerald-600">{item?.guidanceHours ? `+${item.guidanceHours}` : '-'}</td>
+                          <td className="py-1 px-1 text-indigo-500">{item?.dutyHours ? `+${item.dutyHours}` : '-'}</td>
+                          <td className="py-1 px-1 font-bold text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/30">
+                            {item?.totalDailyAdditionalHours || 0}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 border-slate-300 dark:border-slate-600 font-bold bg-slate-100/70 dark:bg-slate-750">
+                      <td className="py-1.5 px-2 text-left font-sans">Haftalık Toplam</td>
+                      <td className="py-1.5 px-1">{dailyMebBreakdown.weeklyNormalLessons}</td>
+                      <td className="py-1.5 px-1 text-slate-600 dark:text-slate-300">{dailyMebBreakdown.weeklyMaasKarsiligi}</td>
+                      <td className="py-1.5 px-1 text-indigo-600">{dailyMebBreakdown.weeklyExcessLessons}</td>
+                      <td className="py-1.5 px-1 text-emerald-600">+{dailyMebBreakdown.weeklyPrepPlanning}</td>
+                      <td className="py-1.5 px-1 text-emerald-600">{dailyMebBreakdown.weeklyGuidance > 0 ? `+${dailyMebBreakdown.weeklyGuidance}` : '-'}</td>
+                      <td className="py-1.5 px-1 text-indigo-500">{dailyMebBreakdown.weeklyDuty > 0 ? `+${dailyMebBreakdown.weeklyDuty}` : '-'}</td>
+                      <td className="py-1.5 px-1 text-blue-700 dark:text-blue-300 bg-blue-100/60 dark:bg-blue-900/40">
+                        {dailyMebBreakdown.weeklyTotalAdditionalHours}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
