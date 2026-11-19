@@ -69,7 +69,7 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
         initialTeacher.branchCategory || inferBranchCategory(initialTeacher.branch)
       );
       setEducationLevel(initialTeacher.educationLevel || 'lisans');
-      setEmploymentType(initialTeacher.employmentType || 'kadrolu');
+      setEmploymentType(initialTeacher.employmentType || 'sozlesmeli');
       setHasGuardDuty(Boolean(initialTeacher.hasGuardDuty));
       setGuardDutyDay(initialTeacher.guardDutyDay || 0);
       setHasClassGuidance(Boolean(initialTeacher.hasClassGuidance));
@@ -77,7 +77,7 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
       setExplanation(initialTeacher.explanation || '');
       setStartDate(initialTeacher.startDate);
       setDepartureDate(initialTeacher.departureDate || '');
-      setHasOtherEmployer(initialTeacher.hasOtherEmployer);
+      setHasOtherEmployer(Boolean(initialTeacher.hasOtherEmployer));
       setOtherEmployerTaxBase(initialTeacher.otherEmployerTaxBase || 0);
       setIsActive(initialTeacher.isActive);
     } else {
@@ -92,7 +92,7 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
       setBranch(defaultBranch);
       setBranchCategory(inferBranchCategory(defaultBranch));
       setEducationLevel('lisans');
-      setEmploymentType('kadrolu');
+      setEmploymentType('sozlesmeli');
       setHasGuardDuty(false);
       setGuardDutyDay(0);
       setHasClassGuidance(false);
@@ -109,6 +109,42 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
     setTouchedIban(false);
     setIsSubmitting(false);
   }, [initialTeacher, isOpen, defaultSchoolId, schools, isSchoolUser, currentUser, rules, availableBranches]);
+
+  // Dynamic status flags
+  const isIskur = employmentType === 'iskurlu';
+  const isStajyer = employmentType === 'stajyer' || employmentType === 'stajer';
+  const isStandardTeacher = !isIskur && !isStajyer;
+
+  // Handler for immediate dynamic adaptation on employment status change
+  const handleEmploymentTypeChange = (newType: EmploymentType) => {
+    setEmploymentType(newType);
+
+    if (newType === 'iskurlu') {
+      // Clear fields not applicable to İŞKUR
+      setHasGuardDuty(false);
+      setGuardDutyDay(0);
+      setHasClassGuidance(false);
+      setHasOtherEmployer(false);
+      setOtherEmployerTaxBase(0);
+      setEducationLevel('lisans');
+      if (!initialTeacher || initialTeacher.employmentType !== 'iskurlu') {
+        setBranch('Destek ve Temizlik Hizmetleri');
+        setBranchCategory('genel_bilgi_ve_brans');
+        if (!explanation) setExplanation('İŞKUR TYP');
+      }
+    } else if (newType === 'stajyer' || newType === 'stajer') {
+      // Clear fields not applicable to Stajyer
+      setHasGuardDuty(false);
+      setGuardDutyDay(0);
+      setHasClassGuidance(false);
+      setHasOtherEmployer(false);
+      setOtherEmployerTaxBase(0);
+      setEducationLevel('lisans');
+      if (!initialTeacher || (initialTeacher.employmentType !== 'stajyer' && initialTeacher.employmentType !== 'stajer')) {
+        if (!explanation) setExplanation('Stajyer');
+      }
+    }
+  };
 
   // Live Validations
   const idValidation = useMemo(() => {
@@ -150,24 +186,34 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
     // Determine assigned school ID with security check for school users
     const assignedSchoolId = isSchoolUser ? (currentUser?.schoolId || schoolId) : schoolId;
 
+    // Sanitize fields based on employment type so hidden fields never retain invalid values
+    const finalGuardDutyDay = isStandardTeacher && guardDutyDay > 0 ? guardDutyDay : undefined;
+    const finalHasGuardDuty = isStandardTeacher && Boolean(finalGuardDutyDay);
+    const finalHasClassGuidance = isStandardTeacher && hasClassGuidance;
+    const finalHasOtherEmployer = isStandardTeacher && hasOtherEmployer;
+    const finalOtherEmployerTaxBase = finalHasOtherEmployer ? Number(otherEmployerTaxBase) : undefined;
+    const finalEducationLevel: EducationLevel = isStandardTeacher ? educationLevel : 'lisans';
+    const finalBranch = branch.trim() || (isIskur ? 'Destek ve Temizlik Hizmetleri' : 'Matematik');
+    const finalBranchCategory = isIskur ? 'genel_bilgi_ve_brans' : branchCategory;
+
     const payload: Omit<Teacher, 'id'> = {
       schoolId: assignedSchoolId,
       nationality,
       tcNo: tcNo.trim().replace(/\s+/g, ''),
       fullName: fullName.trim(),
-      branch: branch.trim() || 'Matematik',
-      branchCategory,
-      educationLevel,
+      branch: finalBranch,
+      branchCategory: finalBranchCategory,
+      educationLevel: finalEducationLevel,
       employmentType,
-      hasGuardDuty: guardDutyDay > 0,
-      guardDutyDay: guardDutyDay > 0 ? guardDutyDay : undefined,
-      hasClassGuidance,
+      hasGuardDuty: finalHasGuardDuty,
+      guardDutyDay: finalGuardDutyDay,
+      hasClassGuidance: finalHasClassGuidance,
       iban: ibanValidation.normalizedIban,
       explanation: explanation.trim() || undefined,
       startDate,
       departureDate: departureDate.trim() || undefined,
-      hasOtherEmployer,
-      otherEmployerTaxBase: hasOtherEmployer ? Number(otherEmployerTaxBase) : undefined,
+      hasOtherEmployer: finalHasOtherEmployer,
+      otherEmployerTaxBase: finalOtherEmployerTaxBase,
       hourlyRate: finalHourlyRate,
       isActive,
     };
@@ -344,64 +390,93 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Branş / Görev Alanı *
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                <span>
+                  {isIskur
+                    ? 'İŞKUR Görev Alanı / Pozisyonu *'
+                    : isStajyer
+                    ? 'Staj Branşı / Alanı *'
+                    : 'Branş / Görev Alanı *'}
+                </span>
               </label>
-              <select
-                value={branch}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setBranch(val);
-                  setBranchCategory(inferBranchCategory(val));
-                }}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-              >
-                <optgroup label="Genel Bilgi ve Branş (15 Saat Maaş Karşılığı)">
-                  {availableBranches
-                    .filter((b) => b.category === 'genel_bilgi_ve_brans')
-                    .map((b) => (
-                      <option key={b.id} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Sınıf Öğretmenliği (18 Saat Maaş Karşılığı)">
-                  {availableBranches
-                    .filter((b) => b.category === 'sinif')
-                    .map((b) => (
-                      <option key={b.id} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Okul Öncesi (18 Saat Maaş Karşılığı)">
-                  {availableBranches
-                    .filter((b) => b.category === 'okul_oncesi')
-                    .map((b) => (
-                      <option key={b.id} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Atölye ve Laboratuvar (20 Saat Maaş Karşılığı)">
-                  {availableBranches
-                    .filter((b) => b.category === 'atolye_laboratuvar')
-                    .map((b) => (
-                      <option key={b.id} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
+              {isIskur ? (
+                <select
+                  value={branch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBranch(val);
+                    setBranchCategory('genel_bilgi_ve_brans');
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                >
+                  <option value="Destek ve Temizlik Hizmetleri">Destek ve Temizlik Hizmetleri</option>
+                  <option value="Güvenlik Hizmetleri">Güvenlik Hizmetleri</option>
+                  <option value="Bakım ve Onarım">Bakım ve Onarım</option>
+                  <option value="Büro ve İdari Destek">Büro ve İdari Destek</option>
+                  <option value="İŞKUR / TYP Personeli">İŞKUR / TYP Personeli</option>
+                </select>
+              ) : (
+                <select
+                  value={branch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBranch(val);
+                    setBranchCategory(inferBranchCategory(val));
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                >
+                  <optgroup label="Genel Bilgi ve Branş (15 Saat Maaş Karşılığı)">
+                    {availableBranches
+                      .filter((b) => b.category === 'genel_bilgi_ve_brans')
+                      .map((b) => (
+                        <option key={b.id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Sınıf Öğretmenliği (18 Saat Maaş Karşılığı)">
+                    {availableBranches
+                      .filter((b) => b.category === 'sinif')
+                      .map((b) => (
+                        <option key={b.id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Okul Öncesi (18 Saat Maaş Karşılığı)">
+                    {availableBranches
+                      .filter((b) => b.category === 'okul_oncesi')
+                      .map((b) => (
+                        <option key={b.id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Atölye ve Laboratuvar (20 Saat Maaş Karşılığı)">
+                    {availableBranches
+                      .filter((b) => b.category === 'atolye_laboratuvar')
+                      .map((b) => (
+                        <option key={b.id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+              )}
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Maaş karşılığı ve azami ek ders hesabı seçilen branşa göre yapılır.
+                {isIskur
+                  ? 'İŞKUR Toplum Yararına Program (TYP / İUP) bünyesindeki görev'
+                  : isStajyer
+                  ? 'Stajyerin eğitim aldığı branş alanı'
+                  : 'Maaş karşılığı ve azami ek ders hesabı seçilen branşa göre yapılır.'}
               </span>
             </div>
           </div>
 
           {/* Academic Qualification & Employment Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Academic Qualification: ONLY Lisans, Yüksek Lisans, Doktora */}
+            {/* Academic Qualification: Kept exactly in current position, fee/rate text hidden */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
@@ -410,18 +485,35 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
               <select
                 value={educationLevel}
                 onChange={(e) => setEducationLevel(e.target.value as EducationLevel)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                disabled={!isStandardTeacher}
+                className={`w-full px-3 py-2 text-xs rounded-xl border font-medium outline-none transition-all ${
+                  !isStandardTeacher
+                    ? 'border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-750 text-slate-600 dark:text-slate-300 cursor-not-allowed'
+                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 cursor-pointer'
+                }`}
               >
-                <option value="lisans">1. Lisans (Standart Birim Ücret - 220,57 TL)</option>
-                <option value="yuksek_lisans">2. Yüksek Lisans (%7 Artırımlı - 236,01 TL)</option>
-                <option value="doktora">3. Doktora (%20 Artırımlı - 264,69 TL)</option>
+                {isIskur ? (
+                  <option value="lisans">İŞKUR Personeli (Akademik Derece Muaf)</option>
+                ) : isStajyer ? (
+                  <option value="lisans">Öğrenci / Stajyer</option>
+                ) : (
+                  <>
+                    <option value="lisans">Lisans</option>
+                    <option value="yuksek_lisans">Yüksek Lisans</option>
+                    <option value="doktora">Doktora</option>
+                  </>
+                )}
               </select>
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Yüksek Lisans (%7) ve Doktora (%20) ek ödeme hak edişini belirler.
+                {isIskur
+                  ? 'İŞKUR personeli için akademik derece ve ek ders artırımı uygulanmaz.'
+                  : isStajyer
+                  ? 'Stajyer öğretmenler için stajyer statüsü geçerlidir.'
+                  : 'Akademik mezuniyet derecesi (Lisans, Yüksek Lisans, Doktora)'}
               </span>
             </div>
 
-            {/* Employment Status: Kadrolu, Stajer, Sözleşmeli, Ücretli vb. */}
+            {/* Employment Status */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                 <Briefcase className="w-3.5 h-3.5 text-slate-500" />
@@ -429,15 +521,14 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
               </label>
               <select
                 value={employmentType}
-                onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+                onChange={(e) => handleEmploymentTypeChange(e.target.value as EmploymentType)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
                 <option value="kadrolu">Kadrolu</option>
-                <option value="stajer">Stajer</option>
                 <option value="sozlesmeli">Sözleşmeli</option>
                 <option value="ucretli">Ücretli</option>
                 <option value="stajyer">Stajyer</option>
-                <option value="iskurlu">İşkurlu</option>
+                <option value="iskurlu">İŞKUR</option>
               </select>
               <span className="text-[10px] text-slate-400 mt-1 block">
                 Personelin kurumdaki yasal istihdam statüsü
@@ -445,59 +536,61 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
             </div>
           </div>
 
-          {/* Additional Duties (Ek Puan ve Görev Kalemleri & Nöbet Günü) */}
-          <div className="p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
-            <span className="text-xs font-bold text-blue-900 dark:text-blue-200 block">
-              Ek Puan ve Görev Kalemleri (Haftalık Ek Ders İlavesi)
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Nöbet Günü Seçimi */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Nöbet Görevi Günü (+3 Saat / Hafta)
-                </label>
-                <select
-                  value={guardDutyDay}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setGuardDutyDay(val);
-                    setHasGuardDuty(val > 0);
-                  }}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                >
-                  <option value={0}>Nöbet Görevi Yok</option>
-                  <option value={1}>Pazartesi</option>
-                  <option value={2}>Salı</option>
-                  <option value={3}>Çarşamba</option>
-                  <option value={4}>Perşembe</option>
-                  <option value={5}>Cuma</option>
-                  <option value={6}>Cumartesi</option>
-                  <option value={7}>Pazar</option>
-                </select>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
-                  Seçilen nöbet gününe puantajda otomatik 3 saatlik ayrı "Nöbet Görevi" satırı açılır.
-                </span>
-              </div>
+          {/* Additional Duties (Ek Puan ve Görev Kalemleri & Nöbet Günü) - Only for standard teachers */}
+          {isStandardTeacher && (
+            <div className="p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
+              <span className="text-xs font-bold text-blue-900 dark:text-blue-200 block">
+                Ek Puan ve Görev Kalemleri (Haftalık Ek Ders İlavesi)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Nöbet Günü Seçimi */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nöbet Görevi Günü (+3 Saat / Hafta)
+                  </label>
+                  <select
+                    value={guardDutyDay}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setGuardDutyDay(val);
+                      setHasGuardDuty(val > 0);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                  >
+                    <option value={0}>Nöbet Görevi Yok</option>
+                    <option value={1}>Pazartesi</option>
+                    <option value={2}>Salı</option>
+                    <option value={3}>Çarşamba</option>
+                    <option value={4}>Perşembe</option>
+                    <option value={5}>Cuma</option>
+                    <option value={6}>Cumartesi</option>
+                    <option value={7}>Pazar</option>
+                  </select>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
+                    Seçilen nöbet gününe puantajda otomatik 3 saatlik ayrı "Nöbet Görevi" satırı açılır.
+                  </span>
+                </div>
 
-              {/* Sınıf Rehberliği */}
-              <div>
-                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 dark:text-slate-300 mt-2">
-                  <input
-                    type="checkbox"
-                    checked={hasClassGuidance}
-                    onChange={(e) => setHasClassGuidance(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                  <div>
-                    <span className="font-semibold block">Sınıf Rehberliği ve Sosyal Etkinlik (+2 Saat)</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Sınıfı/kulübü olan öğretmenlere haftada 2 saat ek ders verilir.
-                    </span>
-                  </div>
-                </label>
+                {/* Sınıf Rehberliği */}
+                <div>
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 dark:text-slate-300 mt-2">
+                    <input
+                      type="checkbox"
+                      checked={hasClassGuidance}
+                      onChange={(e) => setHasClassGuidance(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div>
+                      <span className="font-semibold block">Sınıf Rehberliği ve Sosyal Etkinlik (+2 Saat)</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Sınıfı/kulübü olan öğretmenlere haftada 2 saat ek ders verilir.
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* IBAN Number (Real Turkish IBAN Validation) */}
           <div>
@@ -551,20 +644,34 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Açıklama (Puantaj Şablonu Açıklama Sütunu)
+                {isIskur
+                  ? 'Açıklama / Program Notu'
+                  : isStajyer
+                  ? 'Açıklama / Üniversite Bilgisi'
+                  : 'Açıklama (Puantaj Şablonu Açıklama Sütunu)'}
               </label>
               <input
                 type="text"
                 value={explanation}
                 onChange={(e) => setExplanation(e.target.value)}
-                placeholder="Örn: USTAÖĞRETİCİ"
+                placeholder={
+                  isIskur
+                    ? 'Örn: İŞKUR TYP Personeli'
+                    : isStajyer
+                    ? 'Örn: Stajyer Öğretmen / Gazi Üniversitesi'
+                    : 'Örn: USTAÖĞRETİCİ'
+                }
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Ayrılış Tarihi (Varsa)
+                {isIskur
+                  ? 'Program Bitiş / Ayrılış Tarihi (Varsa)'
+                  : isStajyer
+                  ? 'Staj Bitiş / Ayrılış Tarihi (Varsa)'
+                  : 'Ayrılış Tarihi (Varsa)'}
               </label>
               <input
                 type="date"
@@ -575,35 +682,37 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
             </div>
           </div>
 
-          {/* Other Employer Fields */}
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 space-y-3">
-            <label className="flex items-center space-x-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasOtherEmployer}
-                onChange={(e) => setHasOtherEmployer(e.target.checked)}
-                className="rounded text-blue-600 focus:ring-blue-500"
-              />
-              <span>Başkaca Bir İşverende Çalışıyor mu?</span>
-            </label>
-
-            {hasOtherEmployer && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                  Başkaca İşverende Çalışıyorsa Aylık Vergi Matrahı (TL)
-                </label>
+          {/* Other Employer Fields - Only for standard teachers */}
+          {isStandardTeacher && (
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 space-y-3">
+              <label className="flex items-center space-x-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
                 <input
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={otherEmployerTaxBase}
-                  onChange={(e) => setOtherEmployerTaxBase(Number(e.target.value))}
-                  placeholder="Örn: 18500"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+                  type="checkbox"
+                  checked={hasOtherEmployer}
+                  onChange={(e) => setHasOtherEmployer(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
-              </div>
-            )}
-          </div>
+                <span>Başkaca Bir İşverende Çalışıyor mu?</span>
+              </label>
+
+              {hasOtherEmployer && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                    Başkaca İşverende Çalışıyorsa Aylık Vergi Matrahı (TL)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={otherEmployerTaxBase}
+                    onChange={(e) => setOtherEmployerTaxBase(Number(e.target.value))}
+                    placeholder="Örn: 18500"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Active status checkbox */}
           <div className="flex items-center space-x-2">
