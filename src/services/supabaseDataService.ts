@@ -493,57 +493,95 @@ export const supabaseDataService = {
   // --- Rules ---
   async fetchRules(): Promise<MebPaymentRules | null> {
     if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('meb_payment_rules')
-      .select('*')
-      .eq('id', 'default_rules')
-      .single();
+    try {
+      // 1. Önce katsayı ve artırım tablosundan oku (payment_calculation_rules)
+      const { data: calcData } = await supabase
+        .from('payment_calculation_rules')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) return null;
-    return {
-      ucretliHourlyRate: Number(data.ucretli_hourly_rate || 220.57),
-      gunduzHourlyRate: Number(data.gunduz_hourly_rate || data.ucretli_hourly_rate || 220.57),
-      geceHaftasonuHourlyRate: Number(data.gece_haftasonu_hourly_rate || 236.33),
-      yuksekLisansBonusPercent: Number(data.yuksek_lisans_bonus_percent || 7),
-      doktoraBonusPercent: Number(data.doktora_bonus_percent || 20),
-      ozelEgitimBonusPercent: Number(data.ozel_egitim_bonus_percent || 25),
-      dykBonusPercent: Number(data.dyk_bonus_percent || 100),
-      nobetHoursPerWeek: Number(data.nobet_hours_per_week || 3),
-      sinifRehberlikHoursPerWeek: Number(data.sinif_rehberlik_hours_per_week || 2),
-      bonusFiveToOne: Boolean(data.bonus_five_to_one),
-      incomeTaxRate: Number(data.income_tax_rate || 0.15),
-      stampTaxRate: Number(data.stamp_tax_rate || 0.00759),
-      sgkEmployerShareRate: Number(data.sgk_employer_share_rate || 0.205),
-      sgkEmployeeShareRate: Number(data.sgk_employee_share_rate || 0.14),
-      unemploymentEmployeeRate: Number(data.unemployment_employee_rate || 0.01),
-      effectiveDate: data.effective_date || '2026-07-01',
-    };
+      // 2. Mevzuat tablosundan oku (meb_payment_rules)
+      const { data: mebData } = await supabase
+        .from('meb_payment_rules')
+        .select('*')
+        .eq('id', 'default_rules')
+        .maybeSingle();
+
+      if (!calcData && !mebData) return null;
+
+      const gunduzRate = Number(calcData?.gunduz_hourly_rate ?? mebData?.ucretli_hourly_rate ?? 220.57);
+      const geceRate = Number(calcData?.gece_haftasonu_hourly_rate ?? 236.33);
+
+      return {
+        ucretliHourlyRate: gunduzRate,
+        gunduzHourlyRate: gunduzRate,
+        geceHaftasonuHourlyRate: geceRate,
+        yuksekLisansBonusPercent: Number(calcData?.yuksek_lisans_bonus_percent ?? 7),
+        doktoraBonusPercent: Number(calcData?.doktora_bonus_percent ?? 20),
+        ozelEgitimBonusPercent: Number(calcData?.ozel_egitim_bonus_percent ?? 25),
+        dykBonusPercent: Number(calcData?.dyk_bonus_percent ?? 100),
+        nobetHoursPerWeek: Number(calcData?.nobet_hours_per_week ?? 3),
+        sinifRehberlikHoursPerWeek: Number(calcData?.sinif_rehberlik_hours_per_week ?? 2),
+        bonusFiveToOne: Boolean(mebData?.bonus_five_to_one ?? true),
+        incomeTaxRate: Number(calcData?.income_tax_rate ?? mebData?.income_tax_rate ?? 0.15),
+        stampTaxRate: Number(calcData?.stamp_tax_rate ?? mebData?.stamp_tax_rate ?? 0.00759),
+        sgkEmployerShareRate: Number(mebData?.sgk_employer_share_rate ?? 0.205),
+        sgkEmployeeShareRate: Number(mebData?.sgk_employee_share_rate ?? 0.14),
+        unemploymentEmployeeRate: Number(mebData?.unemployment_employee_rate ?? 0.01),
+        effectiveDate: calcData?.effective_date || '2026-07-01',
+      };
+    } catch (err) {
+      console.warn('fetchRules Supabase hatası:', err);
+      return null;
+    }
   },
 
   async saveRules(rules: MebPaymentRules): Promise<void> {
     if (!supabase) return;
-    const payload = {
-      id: 'default_rules',
-      ucretli_hourly_rate: rules.gunduzHourlyRate || rules.ucretliHourlyRate,
-      gunduz_hourly_rate: rules.gunduzHourlyRate || 220.57,
-      gece_haftasonu_hourly_rate: rules.geceHaftasonuHourlyRate || 236.33,
-      yuksek_lisans_bonus_percent: rules.yuksekLisansBonusPercent || 7,
-      doktora_bonus_percent: rules.doktoraBonusPercent || 20,
-      ozelEgitimBonusPercent: rules.ozelEgitimBonusPercent || 25,
-      dyk_bonus_percent: rules.dykBonusPercent || 100,
-      nobet_hours_per_week: rules.nobetHoursPerWeek || 3,
-      sinif_rehberlik_hours_per_week: rules.sinifRehberlikHoursPerWeek || 2,
-      bonus_five_to_one: rules.bonusFiveToOne,
-      income_tax_rate: rules.incomeTaxRate,
-      stamp_tax_rate: rules.stampTaxRate,
-      sgk_employer_share_rate: rules.sgkEmployerShareRate,
-      sgk_employee_share_rate: rules.sgkEmployeeShareRate,
-      unemployment_employee_rate: rules.unemploymentEmployeeRate,
+
+    const gunduzRate = Number(rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57);
+    const geceRate = Number(rules.geceHaftasonuHourlyRate || 236.33);
+
+    // 1. payment_calculation_rules tablosuna kaydet
+    const calcPayload = {
+      id: 'rules_2026_h2',
       effective_date: rules.effectiveDate || '2026-07-01',
+      gunduz_hourly_rate: gunduzRate,
+      gece_haftasonu_hourly_rate: geceRate,
+      yuksek_lisans_bonus_percent: Number(rules.yuksekLisansBonusPercent ?? 7),
+      doktora_bonus_percent: Number(rules.doktoraBonusPercent ?? 20),
+      ozel_egitim_bonus_percent: Number(rules.ozelEgitimBonusPercent ?? 25),
+      dyk_bonus_percent: Number(rules.dykBonusPercent ?? 100),
+      nobet_hours_per_week: Number(rules.nobetHoursPerWeek ?? 3),
+      sinif_rehberlik_hours_per_week: Number(rules.sinifRehberlikHoursPerWeek ?? 2),
+      income_tax_rate: Number(rules.incomeTaxRate ?? 0.15),
+      stamp_tax_rate: Number(rules.stampTaxRate ?? 0.00759),
+      created_at: new Date().toISOString(),
+    };
+
+    // 2. meb_payment_rules tablosuna kaydet
+    const mebPayload = {
+      id: 'default_rules',
+      ucretli_hourly_rate: gunduzRate,
+      bonus_five_to_one: rules.bonusFiveToOne ?? true,
+      income_tax_rate: Number(rules.incomeTaxRate ?? 0.15),
+      stamp_tax_rate: Number(rules.stampTaxRate ?? 0.00759),
+      sgk_employer_share_rate: Number(rules.sgkEmployerShareRate ?? 0.205),
+      sgk_employee_share_rate: Number(rules.sgkEmployeeShareRate ?? 0.14),
+      unemployment_employee_rate: Number(rules.unemploymentEmployeeRate ?? 0.01),
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from('meb_payment_rules').upsert(payload);
-    if (error) throw error;
+
+    const [resCalc, resMeb] = await Promise.all([
+      supabase.from('payment_calculation_rules').upsert(calcPayload),
+      supabase.from('meb_payment_rules').upsert(mebPayload),
+    ]);
+
+    if (resCalc.error) console.warn('payment_calculation_rules kaydetme uyarısı:', resCalc.error);
+    if (resMeb.error) console.warn('meb_payment_rules kaydetme uyarısı:', resMeb.error);
+    if (resCalc.error && resMeb.error) throw resCalc.error;
   },
 
   // --- Audit Logs ---

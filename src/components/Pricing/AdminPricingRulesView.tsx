@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Coins,
   Save,
@@ -11,6 +11,8 @@ import {
   Trash2,
   Building,
   RotateCcw,
+  RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MebPaymentRules, BranchCategory } from '../../types';
@@ -38,34 +40,65 @@ export const AdminPricingRulesView: React.FC = () => {
   const [stampTaxRate, setStampTaxRate] = useState<number>(rules.stampTaxRate || 0.00759);
   const [effectiveDate, setEffectiveDate] = useState<string>(rules.effectiveDate || '2026-07-01');
 
+  // Supabase'den veya Context'ten güncel kurallar yüklendiğinde form alanlarını senkronize et
+  useEffect(() => {
+    setGunduzRate(rules.gunduzHourlyRate || 220.57);
+    setGeceRate(rules.geceHaftasonuHourlyRate || 236.33);
+    setYlBonus(rules.yuksekLisansBonusPercent ?? 7);
+    setDoktoraBonus(rules.doktoraBonusPercent ?? 20);
+    setOzelEgitimBonus(rules.ozelEgitimBonusPercent ?? 25);
+    setDykBonus(rules.dykBonusPercent ?? 100);
+    setNobetHours(rules.nobetHoursPerWeek ?? 3);
+    setRehberlikHours(rules.sinifRehberlikHoursPerWeek ?? 2);
+    setIncomeTaxRate(rules.incomeTaxRate ?? 0.15);
+    setStampTaxRate(rules.stampTaxRate ?? 0.00759);
+    setEffectiveDate(rules.effectiveDate || '2026-07-01');
+  }, [rules]);
+
   // Branch list state
   const [branches, setBranches] = useState(() => getStoredBranches());
   const [newBranchName, setNewBranchName] = useState('');
   const [newBranchCategory, setNewBranchCategory] = useState<BranchCategory>('genel_bilgi_ve_brans');
 
+  const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSaveRules = (e: React.FormEvent) => {
+  const handleSaveRules = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated: MebPaymentRules = {
-      ...rules,
-      gunduzHourlyRate: Number(gunduzRate),
-      geceHaftasonuHourlyRate: Number(geceRate),
-      ucretliHourlyRate: Number(gunduzRate),
-      yuksekLisansBonusPercent: Number(ylBonus),
-      doktoraBonusPercent: Number(doktoraBonus),
-      ozelEgitimBonusPercent: Number(ozelEgitimBonus),
-      dykBonusPercent: Number(dykBonus),
-      nobetHoursPerWeek: Number(nobetHours),
-      sinifRehberlikHoursPerWeek: Number(rehberlikHours),
-      incomeTaxRate: Number(incomeTaxRate),
-      stampTaxRate: Number(stampTaxRate),
-      effectiveDate,
-    };
+    if (!isAdmin) {
+      alert('Yalnızca yönetici (Admin) ücret ve kural güncelleyebilir.');
+      return;
+    }
 
-    updateRules(updated);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      const updated: MebPaymentRules = {
+        ...rules,
+        gunduzHourlyRate: Number(gunduzRate),
+        geceHaftasonuHourlyRate: Number(geceRate),
+        ucretliHourlyRate: Number(gunduzRate),
+        yuksekLisansBonusPercent: Number(ylBonus),
+        doktoraBonusPercent: Number(doktoraBonus),
+        ozelEgitimBonusPercent: Number(ozelEgitimBonus),
+        dykBonusPercent: Number(dykBonus),
+        nobetHoursPerWeek: Number(nobetHours),
+        sinifRehberlikHoursPerWeek: Number(rehberlikHours),
+        incomeTaxRate: Number(incomeTaxRate),
+        stampTaxRate: Number(stampTaxRate),
+        effectiveDate,
+      };
+
+      await updateRules(updated);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Kurallar kaydedilirken bir hata oluştu.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddBranch = () => {
@@ -137,6 +170,20 @@ export const AdminPricingRulesView: React.FC = () => {
         </div>
       )}
 
+      {errorMessage && (
+        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {!isAdmin && (
+        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+          <Lock className="w-4 h-4 shrink-0" />
+          <span>Ücret ve hesaplama kuralları yalnızca sistem yöneticisi (Admin) tarafından değiştirilebilir. Kurum kullanıcıları salt-okunur olarak görüntüler.</span>
+        </div>
+      )}
+
       <form onSubmit={handleSaveRules} className="space-y-6">
         {/* 1. Ek Ders Birim Ücretleri (Katsayılar) */}
         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
@@ -153,7 +200,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 type="date"
                 value={effectiveDate}
                 onChange={(e) => setEffectiveDate(e.target.value)}
-                className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-xs font-semibold"
+                disabled={!isAdmin || isSaving}
+                className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-xs font-semibold disabled:opacity-60"
               />
             </div>
           </div>
@@ -168,7 +216,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.01"
                 value={gunduzRate}
                 onChange={(e) => setGunduzRate(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
                 Lisans mezunları için geçerli temel birim ücret.
@@ -184,7 +233,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.01"
                 value={geceRate}
                 onChange={(e) => setGeceRate(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
                 Cumartesi/Pazar ve akşam dersleri için uygulanır.
@@ -200,10 +250,11 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="1"
                 value={dykBonus}
                 onChange={(e) => setDykBonus(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                DYK dersleri %100 artırımlıdır ({formatTRY(gunduzRate * 2)}).
+                DYK dersleri %{dykBonus} artırımlıdır ({formatTRY(Math.round(gunduzRate * (1 + dykBonus / 100) * 100) / 100)}).
               </span>
             </div>
           </div>
@@ -228,10 +279,11 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.5"
                 value={ylBonus}
                 onChange={(e) => setYlBonus(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Yüksek Lisans: +%{ylBonus} -&gt; {formatTRY(236.01)}
+                Yüksek Lisans: +%{ylBonus} -&gt; {formatTRY(Math.round(gunduzRate * (1 + ylBonus / 100) * 100) / 100)}
               </span>
             </div>
 
@@ -244,10 +296,11 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.5"
                 value={doktoraBonus}
                 onChange={(e) => setDoktoraBonus(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Doktora: +%{doktoraBonus} -&gt; {formatTRY(264.69)}
+                Doktora: +%{doktoraBonus} -&gt; {formatTRY(Math.round(gunduzRate * (1 + doktoraBonus / 100) * 100) / 100)}
               </span>
             </div>
 
@@ -260,10 +313,11 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.5"
                 value={ozelEgitimBonus}
                 onChange={(e) => setOzelEgitimBonus(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Özel Eğitim: +%{ozelEgitimBonus} -&gt; {formatTRY(275.71)}
+                Özel Eğitim: +%{ozelEgitimBonus} -&gt; {formatTRY(Math.round(gunduzRate * (1 + ozelEgitimBonus / 100) * 100) / 100)}
               </span>
             </div>
           </div>
@@ -287,7 +341,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 type="number"
                 value={nobetHours}
                 onChange={(e) => setNobetHours(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Standart: 3 saat</span>
             </div>
@@ -300,7 +355,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 type="number"
                 value={rehberlikHours}
                 onChange={(e) => setRehberlikHours(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Standart: 2 saat</span>
             </div>
@@ -312,7 +368,8 @@ export const AdminPricingRulesView: React.FC = () => {
               <select
                 value={incomeTaxRate}
                 onChange={(e) => setIncomeTaxRate(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none cursor-pointer"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none cursor-pointer disabled:opacity-60"
               >
                 <option value={0.15}>%15 (1. Dilim Standart)</option>
                 <option value={0.20}>%20 (2. Dilim)</option>
@@ -330,7 +387,8 @@ export const AdminPricingRulesView: React.FC = () => {
                 step="0.00001"
                 value={stampTaxRate}
                 onChange={(e) => setStampTaxRate(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                disabled={!isAdmin || isSaving}
+                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none disabled:opacity-60"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Kanuni oran: Binde 7.59 (0.00759)</span>
             </div>
@@ -342,10 +400,20 @@ export const AdminPricingRulesView: React.FC = () => {
           <div className="flex justify-end">
             <button
               type="submit"
-              className="flex items-center space-x-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-lg transition-all"
+              disabled={isSaving}
+              className="flex items-center space-x-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold shadow-lg transition-all"
             >
-              <Save className="w-4 h-4" />
-              <span>Katsayı ve Kuralları Kaydet</span>
+              {isSaving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Kaydediliyor ve Puantajlar Güncelleniyor...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Katsayı ve Kuralları Kaydet</span>
+                </>
+              )}
             </button>
           </div>
         )}

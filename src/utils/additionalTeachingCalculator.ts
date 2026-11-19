@@ -29,36 +29,38 @@ export function calculateEffectiveHourlyRate(
   // Temel gündüz ek ders ücreti (140 gösterge)
   const baseDayRate = rules.gunduzHourlyRate || 220.57;
 
-  // 1. DYK Kursu: %100 artırımlı -> 441,14 TL
+  // 1. DYK Kursu: Kurallardaki dykBonusPercent oranında artırımlı (Varsayılan %100 -> 441.14 TL)
   if (options?.isDyk) {
-    const rate = 441.14;
-    return { baseRate: baseDayRate, bonusPercent: rules.dykBonusPercent || 100, effectiveRate: rate };
+    const bonus = Number(rules.dykBonusPercent ?? 100);
+    const rate = Math.round(baseDayRate * (1 + bonus / 100) * 100) / 100;
+    return { baseRate: baseDayRate, bonusPercent: bonus, effectiveRate: rate };
   }
 
-  // 2. Özel Eğitim / Destek Eğitimi: %25 artırımlı -> 275,71 TL
+  // 2. Özel Eğitim / Destek Eğitimi: Kurallardaki ozelEgitimBonusPercent oranında artırımlı (Varsayılan %25 -> 275.71 TL)
   if (options?.isOzelEgitim) {
-    const rate = 275.71;
-    return { baseRate: baseDayRate, bonusPercent: rules.ozelEgitimBonusPercent || 25, effectiveRate: rate };
+    const bonus = Number(rules.ozelEgitimBonusPercent ?? 25);
+    const rate = Math.round(baseDayRate * (1 + bonus / 100) * 100) / 100;
+    return { baseRate: baseDayRate, bonusPercent: bonus, effectiveRate: rate };
   }
 
-  // 3. Gece, Hafta Sonu ve Tatil: 150 gösterge -> 236,33 TL
+  // 3. Gece, Hafta Sonu ve Tatil: 150 gösterge karşılığı
   if (options?.isGeceHaftasonu) {
-    const nightRate = rules.geceHaftasonuHourlyRate || 236.33;
+    const nightRate = Number(rules.geceHaftasonuHourlyRate || 236.33);
     return { baseRate: nightRate, bonusPercent: 0, effectiveRate: nightRate };
   }
 
   // 4. Akademik Eğitim Düzeyi
   if (educationLevel === 'doktora') {
-    // Doktora Mezunu (Gündüz): %20 artırımlı -> 264,69 TL (168 gösterge karşılığı)
-    const bonus = rules.doktoraBonusPercent || 20;
-    const rate = 264.69;
+    // Doktora Mezunu (Gündüz): Kurallardaki doktoraBonusPercent oranında artırımlı (Varsayılan %20 -> 264.69 TL)
+    const bonus = Number(rules.doktoraBonusPercent ?? 20);
+    const rate = Math.round(baseDayRate * (1 + bonus / 100) * 100) / 100;
     return { baseRate: baseDayRate, bonusPercent: bonus, effectiveRate: rate };
   }
 
   if (educationLevel === 'yuksek_lisans') {
-    // Yüksek Lisans Mezunu (Gündüz): %7 artırımlı -> 236,01 TL
-    const bonus = rules.yuksekLisansBonusPercent || 7;
-    const rate = 236.01;
+    // Yüksek Lisans Mezunu (Gündüz): Kurallardaki yuksekLisansBonusPercent oranında artırımlı (Varsayılan %7 -> 236.01 TL)
+    const bonus = Number(rules.yuksekLisansBonusPercent ?? 7);
+    const rate = Math.round(baseDayRate * (1 + bonus / 100) * 100) / 100;
     return { baseRate: baseDayRate, bonusPercent: bonus, effectiveRate: rate };
   }
 

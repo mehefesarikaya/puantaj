@@ -158,7 +158,7 @@ interface AppContextType {
   deleteTimesheetPeriod: (periodId: string) => Promise<void>;
 
   // Rules & Reset
-  updateRules: (newRules: MebPaymentRules) => void;
+  updateRules: (newRules: MebPaymentRules) => Promise<void>;
   resetToDefaults: () => void;
 
   // Migration & Security Audit
@@ -1387,12 +1387,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAction('Excel İçe Aktarıldı', `${importedRows.length} öğretmenin verisi yüklendi.`);
   };
 
-  const updateRules = (newRules: MebPaymentRules) => {
-    setRules(newRules);
-    if (isSupabaseActive) {
-      supabaseDataService.saveRules(newRules).catch(console.error);
+  const updateRules = async (newRules: MebPaymentRules): Promise<void> => {
+    // 1. Yetki Kontrolü: Sadece Yönetici (Admin) ücret ve kuralları değiştirebilir
+    if (currentUser && currentUser.role !== 'admin') {
+      alert('Bu işlem için yönetici (Admin) yetkisi gerekmektedir.');
+      return;
     }
-    logAction('MEB Ödeme Kuralları Güncellendi', `Saat ücreti: ${newRules.gunduzHourlyRate || newRules.ucretliHourlyRate} TL.`);
+
+    setRules(newRules);
+
+    // 2. Supabase Backend'e kalıcı kaydet
+    if (isSupabaseActive) {
+      try {
+        await supabaseDataService.saveRules(newRules);
+      } catch (err) {
+        console.error('Kurallar Supabase veritabanına kaydedilemedi:', err);
+      }
+    }
+
+    // 3. Etkilenen ve henüz onaylanmamış puantaj kayıtlarını güncel kurallara göre yeniden hesapla
+    // (Onaylanmış geçmiş puantajlar ASLA değiştirilmez)
+    const rowsToPersist: TeacherMonthlyPuantajRow[] = [];
+    setPuantajRows((prevRows) => {
+      const updatedList = prevRows.map((row) => {
+        const sub = submissions.find(
+          (s) => s.schoolId === row.schoolId && s.year === row.year && s.month === row.month
+        );
+        const isApproved = sub?.status === 'onaylandi';
+        if (isApproved) {
+          // Onaylanmış puantajlara dokunma
+          return row;
+        }
+
+        const teacher = allTeachers.find((t) => t.id === row.teacherId);
+        if (!teacher) return row;
+
+        const schedule = weeklySchedules.find((s) => s.teacherId === teacher.id);
+        const period = getTimesheetPeriod(row.year, row.month);
+
+        if (schedule) {
+          const syncResult = syncTeacherScheduleToMonth({
+            teacher,
+            schedule,
+            year: row.year,
+            month: row.month,
+            existingRow: row,
+            isSubmissionLocked: false,
+            periodStartDate: period.startDate,
+            periodEndDate: period.endDate,
+            rules: newRules,
+          });
+          rowsToPersist.push(syncResult.updatedRow);
+          return syncResult.updatedRow;
+        } else {
+          const hourlyRate = teacher.hourlyRate > 0 ? teacher.hourlyRate : (newRules.gunduzHourlyRate || 220.57);
+          const newPayment = Math.round(row.payableTotalHours * hourlyRate * 100) / 100;
+          const updatedRow = {
+            ...row,
+            estimatedPayment: newPayment,
+          };
+          rowsToPersist.push(updatedRow);
+          return updatedRow;
+        }
+      });
+
+      return updatedList;
+    });
+
+    if (isSupabaseActive && rowsToPersist.length > 0) {
+      supabaseDataService.batchUpsertPuantajRows(rowsToPersist).catch(console.error);
+    }
+
+    logAction(
+      'MEB Ödeme Kuralları Güncellendi ve Puantajlar Yeniden Hesaplandı',
+      `Yeni saat ücreti: ${newRules.gunduzHourlyRate || newRules.ucretliHourlyRate} TL.`
+    );
   };
 
   const saveWeeklySchedule = async (schedule: TeacherWeeklySchedule) => {
