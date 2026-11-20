@@ -73,7 +73,7 @@ export const SchoolDashboardView: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2 text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">
-              <span>Kolay Ek Ders Kurum Paneli</span>
+              <span>Kolay Ekders Kurum Paneli</span>
               <span>•</span>
               <span>{monthName} {selectedYear} Dönemi</span>
             </div>

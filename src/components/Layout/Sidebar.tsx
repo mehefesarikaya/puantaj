@@ -4,6 +4,7 @@ import {
   Building2,
   Users,
   TableProperties,
+  Table2,
   ClipboardCheck,
   Calculator,
   FileSpreadsheet,
@@ -78,15 +79,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center space-x-3">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-md ${
-                isAdmin ? 'bg-blue-600 shadow-blue-500/20' : 'bg-indigo-600 shadow-indigo-500/20'
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-md ${
+                isAdmin
+                  ? 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/20'
+                  : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/20'
               }`}
             >
-              KED
+              <Table2 className="w-5 h-5 text-white" />
             </div>
             <div className="truncate max-w-[140px]">
               <h1 className="font-bold text-slate-900 dark:text-white leading-tight text-sm truncate">
-                Kolay Ek Ders
+                Kolay Ekders
               </h1>
               <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider truncate">
                 {isAdmin ? 'Yönetici Paneli' : school?.name || 'Kurum Paneli'}

@@ -66,7 +66,7 @@ export const AdminSettingsView: React.FC = () => {
       {/* Title */}
       <div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-          Kolay Ek Ders Sistem ve Mevzuat Ayarları
+          Kolay Ekders Sistem ve Mevzuat Ayarları
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Ders saati ücreti katsayıları, 5'e 1 ilavesi, vergi oranları, Supabase veritabanı entegrasyonu, veri aktarımı ve güvenlik denetimi.

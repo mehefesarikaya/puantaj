@@ -4,6 +4,7 @@ import {
   User,
   AlertCircle,
   ArrowRight,
+  Table2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -35,11 +36,11 @@ export const LoginView: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-2xl mx-auto shadow-lg shadow-blue-500/30">
-          KED
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
+          <Table2 className="w-9 h-9 text-white" />
         </div>
         <h2 className="mt-4 text-2xl font-extrabold text-white tracking-tight">
-          Kolay Ek Ders
+          Kolay Ekders
         </h2>
         <p className="mt-1 text-xs text-blue-200">
           Öğretmen Ders Programı ve Ek Ders Puantaj Portalı

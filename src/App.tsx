@@ -1,4 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
+import { Table2 } from 'lucide-react';
 import { useApp } from './context/AppContext';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
@@ -58,11 +59,11 @@ export const App: React.FC = () => {
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center space-y-3 font-sans">
-        <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-blue-500/30">
-          KED
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <Table2 className="w-7 h-7 text-white" />
         </div>
         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs text-blue-200 font-semibold tracking-wide">Kolay Ek Ders yükleniyor...</p>
+        <p className="text-xs text-blue-200 font-semibold tracking-wide">Kolay Ekders yükleniyor...</p>
       </div>
     );
   }
@@ -143,7 +144,7 @@ export const App: React.FC = () => {
           </div>
 
           <footer className="mt-8 pt-4 pb-2 border-t border-slate-200 dark:border-slate-800 text-center text-[11px] text-slate-400 dark:text-slate-500">
-            <span>Kolay Ek Ders © 2026 – </span>
+            <span>Kolay Ekders © 2026 – </span>
             <a
               href="https://kolayekders.com"
               target="_blank"

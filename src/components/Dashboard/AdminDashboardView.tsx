@@ -145,7 +145,7 @@ export const AdminDashboardView: React.FC = () => {
               <span>{monthName} {selectedYear} Dönemi</span>
             </div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Kolay Ek Ders – Yönetici ve Puantaj Takip Sistemi
+              Kolay Ekders – Yönetici ve Puantaj Takip Sistemi
             </h2>
             <p className="text-blue-100 text-xs mt-1 max-w-2xl leading-relaxed">
               İlçe genelindeki okulları bağlı bulundukları Genel Müdürlüklere göre listeleyin,
