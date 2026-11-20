@@ -133,10 +133,15 @@ export function calculateWeeklyAdditionalTeaching(
   const category: BranchCategory =
     teacher.branchCategory || inferBranchCategory(teacher.branch);
   const config = BRANCH_CATEGORY_CONFIGS[category] || BRANCH_CATEGORY_CONFIGS.genel_bilgi_ve_brans;
-  const maasKarsiligiHours = 0;
 
-  // 3. Planlanan temel ders saati
-  const excessLessonHours = weeklyScheduledHours;
+  // Maaş Karşılığı: SADECE Sözleşmeli personelde düşülür!
+  // Ücretli öğretmen ve diğer bütün personel türlerinde maaş karşılığı 0'dır (düşülmez).
+  const maasKarsiligiHours = isSozlesmeli(teacher)
+    ? Math.min(weeklyScheduledHours, config.maasKarsiligiHours)
+    : 0;
+
+  // 3. Planlanan temel ders saati (Maaş karşılığı düşüldükten sonra kalan maaş üstü ek ders)
+  const excessLessonHours = Math.max(0, weeklyScheduledHours - maasKarsiligiHours);
 
   // 4. Hazırlık ve Planlama / İlave Ek Ders:
   // - Yalnızca Ücretli öğretmenler: 2+1 sistemi (Haftalık planlanan her 2 saate 1 saat)

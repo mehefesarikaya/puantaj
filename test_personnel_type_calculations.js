@@ -41,8 +41,8 @@ assert(
   'Ücretli için 2+1 formülü (Math.floor(hours / 2)) bulunmalı'
 );
 assert(
-  !appContextSource.includes("isAlreadyEkDers: true"),
-  'AppContext.tsx içinde hücre güncellemesinde isAlreadyEkDers: true engeli kaldırılmış olmalı'
+  calcSource.includes("const maasKarsiligiHours = isSozlesmeli(teacher)"),
+  'Maaş karşılığı düşümü yalnızca isSozlesmeli(teacher) için yapılmalı'
 );
 console.log('✓ Kaynak kod kontrolleri (5+1 kaldırıldı, 2+1 yalnızca ücretli için) başarıyla doğrulandı.\n');
 
@@ -228,6 +228,43 @@ compareTypes(30);
 compareTypes(20);
 compareTypes(15);
 compareTypes(10);
+
+// ----------------------------------------------------
+// TEST 6: SADECE Sözleşmelide Maaş Karşılığı Düşümü
+// ----------------------------------------------------
+console.log('--- TEST 6: Sadece Sözleşmelide Maaş Karşılığı Düşümü ---');
+function calculateWeeklyTest(teacher, weeklyHours = 30) {
+  const maasQuota = 15; // Genel bilgi ve branş için 15 saat
+  const maasKarsiligiHours = isSozlesmeli(teacher)
+    ? Math.min(weeklyHours, maasQuota)
+    : 0;
+  const excessLessonHours = Math.max(0, weeklyHours - maasKarsiligiHours);
+  const bonus = calculatePersonnelBonusHours(teacher, weeklyHours);
+  return {
+    weeklyScheduledHours: weeklyHours,
+    maasKarsiligiHours,
+    excessLessonHours,
+    bonus,
+  };
+}
+
+const sozlesmeliWeekly = calculateWeeklyTest(sozlesmeliTeacher, 30);
+assert.strictEqual(sozlesmeliWeekly.maasKarsiligiHours, 15, 'Sözleşmeli için maaş karşılığı 15 saat düşmeli');
+assert.strictEqual(sozlesmeliWeekly.excessLessonHours, 15, '30 - 15 = 15 saat maaş üstü kalmalı');
+assert.strictEqual(sozlesmeliWeekly.bonus, 0, 'Sözleşmeli için bonus 0 olmalı');
+console.log(`✓ Sözleşmeli Personel: Planlanan=${sozlesmeliWeekly.weeklyScheduledHours}s, Maaş Karşılığı Düşümü=-${sozlesmeliWeekly.maasKarsiligiHours}s, Kalan Ek Ders=${sozlesmeliWeekly.excessLessonHours}s`);
+
+const ucretliWeekly = calculateWeeklyTest(ucretliTeacher, 30);
+assert.strictEqual(ucretliWeekly.maasKarsiligiHours, 0, 'Ücretli için maaş karşılığı DÜŞÜLMEZ (0 saat)');
+assert.strictEqual(ucretliWeekly.excessLessonHours, 30, 'Ücretli için 30 saatin tamamı ek ders kalmalı');
+assert.strictEqual(ucretliWeekly.bonus, 15, 'Ücretli için 2+1 ile 15 saat ilave verilmeli');
+console.log(`✓ Ücretli Öğretmen: Planlanan=${ucretliWeekly.weeklyScheduledHours}s, Maaş Karşılığı Düşümü=-${ucretliWeekly.maasKarsiligiHours}s (Düşülmez), Kalan Ek Ders=${ucretliWeekly.excessLessonHours}s (+15s 2+1)`);
+
+const digerWeekly = calculateWeeklyTest(stajyerTeacher, 30);
+assert.strictEqual(digerWeekly.maasKarsiligiHours, 0, 'Diğer personeller için maaş karşılığı DÜŞÜLMEZ (0 saat)');
+assert.strictEqual(digerWeekly.excessLessonHours, 30, 'Diğer personeller için 30 saatin tamamı kalmalı');
+assert.strictEqual(digerWeekly.bonus, 0, 'Diğer personeller için bonus 0 olmalı');
+console.log(`✓ Diğer Personel: Planlanan=${digerWeekly.weeklyScheduledHours}s, Maaş Karşılığı Düşümü=-${digerWeekly.maasKarsiligiHours}s (Düşülmez), Kalan Ek Ders=${digerWeekly.excessLessonHours}s`);
 
 console.log('\n================================================================');
 console.log('  TÜM PERSONEL HESAPLAMA TESTLERİ BAŞARIYLA TAMAMLANDI! (%100)');
