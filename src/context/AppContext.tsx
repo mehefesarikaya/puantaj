@@ -204,22 +204,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [allTeachers, setAllTeachers] = useState<Teacher[]>(() => {
-    const loaded = loadStoredData<Teacher[]>(STORAGE_KEYS.TEACHERS, INITIAL_TEACHERS);
-    if (!loaded.some((t) => t.id === 't-7')) {
-      const t7 = INITIAL_TEACHERS.find((t) => t.id === 't-7');
-      if (t7) return [...loaded, t7];
+    if (isSupabaseActive) {
+      const loaded = loadStoredData<Teacher[]>(STORAGE_KEYS.TEACHERS, []);
+      const mockIds = new Set(['t-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7']);
+      return loaded.filter((t) => !mockIds.has(t.id));
     }
-    return loaded;
+    return loadStoredData<Teacher[]>(STORAGE_KEYS.TEACHERS, INITIAL_TEACHERS);
   });
 
   const [puantajRows, setPuantajRows] = useState<TeacherMonthlyPuantajRow[]>(() => {
-    const loaded = loadStoredData<TeacherMonthlyPuantajRow[]>(STORAGE_KEYS.PUANTAJ_ROWS, generateInitialPuantajRows());
-    if (!loaded.some((p) => p.teacherId === 't-7')) {
-      const initialRows = generateInitialPuantajRows();
-      const t7Row = initialRows.find((p) => p.teacherId === 't-7');
-      if (t7Row) return [...loaded, t7Row];
+    if (isSupabaseActive) {
+      const loaded = loadStoredData<TeacherMonthlyPuantajRow[]>(STORAGE_KEYS.PUANTAJ_ROWS, []);
+      const mockIds = new Set(['t-1', 't-2', 't-3', 't-4', 't-5', 't-6', 't-7']);
+      return loaded.filter((p) => !mockIds.has(p.teacherId));
     }
-    return loaded;
+    return loadStoredData<TeacherMonthlyPuantajRow[]>(STORAGE_KEYS.PUANTAJ_ROWS, generateInitialPuantajRows());
   });
 
   const [submissions, setSubmissions] = useState<SchoolMonthlySubmission[]>(() =>
@@ -368,13 +367,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ] = await Promise.race([fetchAllPromise, timeoutPromise]);
 
       if (remoteSchools && remoteSchools.length > 0) setSchools(remoteSchools);
-      if (remoteTeachers && remoteTeachers.length > 0) setAllTeachers(remoteTeachers);
+      if (Array.isArray(remoteTeachers)) setAllTeachers(remoteTeachers);
       if (remoteSubmissions && remoteSubmissions.length > 0) setSubmissions(remoteSubmissions);
       if (remoteRules) setRules(remoteRules);
       if (remotePeriods && remotePeriods.length > 0) setTimesheetPeriods(remotePeriods);
       if (remoteSchedules && remoteSchedules.length > 0) setWeeklySchedules(remoteSchedules);
       if (remoteLogs && remoteLogs.length > 0) setAuditLogs(remoteLogs);
-      if (remotePuantaj && remotePuantaj.length > 0) setPuantajRows(remotePuantaj);
+      if (Array.isArray(remotePuantaj)) setPuantajRows(remotePuantaj);
       if (remoteBranches && remoteBranches.length > 0) setBranches(remoteBranches);
       setBackendMode('supabase');
     } catch (err) {
@@ -531,8 +530,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Strict Data Isolation Filter for teachers
-  const teachers = currentUser?.role === 'school_user' && currentUser.schoolId
-    ? allTeachers.filter((t) => t.schoolId === currentUser.schoolId)
+  const teachers = currentUser?.role === 'school_user'
+    ? (currentUser.schoolId ? allTeachers.filter((t) => t.schoolId === currentUser.schoolId) : [])
     : allTeachers;
 
   // School actions
@@ -656,7 +655,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Teacher actions
-  const addTeacher = (teacherData: Omit<Teacher, 'id'>) => {
+  const addTeacher = async (teacherData: Omit<Teacher, 'id'>) => {
     // Security enforcement: School users cannot assign another school or modify hourly fee
     const safeSchoolId =
       currentUser?.role === 'school_user' && currentUser.schoolId
@@ -678,12 +677,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAllTeachers((prev) => [...prev, newTeacher]);
 
     if (isSupabaseActive) {
-      supabaseDataService.upsertTeacher(newTeacher).catch(console.error);
+      try {
+        await supabaseDataService.upsertTeacher(newTeacher);
+      } catch (err) {
+        console.error('Supabase öğretmen ekleme hatası:', err);
+      }
     }
     logAction('Öğretmen Eklendi', `${newTeacher.fullName} sisteme kaydedildi.`);
   };
 
-  const updateTeacher = (updatedTeacher: Teacher) => {
+  const updateTeacher = async (updatedTeacher: Teacher) => {
     // Security enforcement: School users cannot transfer school or change hourly fee
     const safeSchoolId =
       currentUser?.role === 'school_user' && currentUser.schoolId
@@ -707,18 +710,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((t) => (t.id === safeTeacher.id ? safeTeacher : t))
     );
     if (isSupabaseActive) {
-      supabaseDataService.upsertTeacher(safeTeacher).catch(console.error);
+      try {
+        await supabaseDataService.upsertTeacher(safeTeacher);
+      } catch (err) {
+        console.error('Supabase öğretmen güncelleme hatası:', err);
+      }
     }
     logAction('Öğretmen Güncellendi', `${safeTeacher.fullName} bilgileri güncellendi.`);
   };
 
-  const deleteTeacher = (id: string) => {
+  const deleteTeacher = async (id: string) => {
     const target = allTeachers.find((t) => t.id === id);
     setAllTeachers((prev) => prev.filter((t) => t.id !== id));
     setPuantajRows((prev) => prev.filter((p) => p.teacherId !== id));
 
     if (isSupabaseActive) {
-      supabaseDataService.deleteTeacher(id).catch(console.error);
+      try {
+        await supabaseDataService.deleteTeacher(id);
+      } catch (err) {
+        console.error('Supabase öğretmen silme hatası:', err);
+      }
     }
     logAction('Öğretmen Silindi', `${target?.fullName || id} silindi.`);
   };
@@ -1725,8 +1736,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetToDefaults = () => {
     setSchools(INITIAL_SCHOOLS);
-    setAllTeachers(INITIAL_TEACHERS);
-    setPuantajRows(generateInitialPuantajRows());
+    setAllTeachers(isSupabaseActive ? [] : INITIAL_TEACHERS);
+    setPuantajRows(isSupabaseActive ? [] : generateInitialPuantajRows());
     setSubmissions(INITIAL_SUBMISSIONS);
     setRules(DEFAULT_MEB_PAYMENT_RULES);
     setAccounts(INITIAL_ACCOUNTS);

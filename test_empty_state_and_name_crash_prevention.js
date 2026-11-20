@@ -33,8 +33,8 @@ assert(
 );
 
 assert(
-  appContextContent.includes('if (remoteTeachers && remoteTeachers.length > 0) setAllTeachers(remoteTeachers);'),
-  'AppContext.tsx: remoteTeachers boş dizi geldiğinde local öğretmenleri sıfırlamıyor.'
+  appContextContent.includes('if (Array.isArray(remoteTeachers)) setAllTeachers(remoteTeachers);'),
+  'AppContext.tsx: remoteTeachers Supabase senkronizasyonunda gerçek öğretmen listesini aktarıyor (mock öğretmen engeli).'
 );
 
 assert(
