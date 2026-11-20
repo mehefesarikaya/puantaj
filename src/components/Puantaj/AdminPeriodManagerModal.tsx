@@ -366,10 +366,10 @@ export const AdminPeriodManagerModal: React.FC<AdminPeriodManagerModalProps> = (
                       </div>
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white">
-                          {school.name}
+                          {school?.name || ''}
                         </div>
                         <div className="text-[11px] text-slate-500">
-                          Kurum Kodu: {school.institutionCode} • {school.district}
+                          Kurum Kodu: {school?.institutionCode || '-'} • {school?.district || '-'}
                         </div>
                       </div>
                     </div>

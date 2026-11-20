@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
               <option value="all">Tüm Okullar ({schools.length} Kurum)</option>
               {schools.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s?.name || ''}
                 </option>
               ))}
             </select>

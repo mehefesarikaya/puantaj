@@ -518,15 +518,15 @@ export const AdminDashboardView: React.FC = () => {
                 const status = sub?.status || 'bekleniyor';
 
                 return (
-                  <tr key={school.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
+                  <tr key={school?.id || Math.random()} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
                     <td className="py-2.5 px-3 font-mono font-semibold text-slate-500">
-                      {school.institutionCode}
+                      {school?.institutionCode || '-'}
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
-                      {school.name}
+                      {school?.name || 'Kurum Adı'}
                     </td>
                     <td className="py-2.5 px-3">
-                      {school.generalDirectorate ? (
+                      {school?.generalDirectorate ? (
                         <span className="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                           {school.generalDirectorate}
                         </span>

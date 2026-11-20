@@ -11,7 +11,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Teacher } from '../../types';
+import { Teacher, School } from '../../types';
 import { AdminTeacherFormModal } from '../Teachers/AdminTeacherFormModal';
 import { TeacherWeeklyScheduleModal } from '../Schedule/TeacherWeeklyScheduleModal';
 import { formatTRY } from '../../utils/paymentCalculator';
@@ -31,7 +31,23 @@ export const SchoolTeacherListView: React.FC = () => {
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [selectedTeacherForSchedule, setSelectedTeacherForSchedule] = useState<Teacher | null>(null);
 
-  const school = schools.find((s) => s.id === currentUser?.schoolId) || schools[0];
+  // Safe fallback school
+  const fallbackSchool: School = {
+    id: currentUser?.schoolId || 'default-school',
+    institutionCode: currentUser?.username || '000000',
+    name: currentUser?.fullName ? currentUser.fullName.replace(' Yetkilisi', '') : 'Kurum',
+    province: 'Ankara',
+    district: 'İlçe / İl',
+    schoolType: 'Okul',
+    principalName: '',
+    contactPhone: '',
+    contactEmail: '',
+    generalDirectorate: 'Temel Eğitim Genel Müdürlüğü',
+    accountActive: true,
+    isActive: true,
+  };
+
+  const school = (currentUser?.schoolId ? schools.find((s) => s.id === currentUser.schoolId) : null) || schools[0] || fallbackSchool;
 
   const filteredTeachers = teachers.filter(
     (t) =>
@@ -56,7 +72,7 @@ export const SchoolTeacherListView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            {school.name} – Görevli Öğretmen ve Personel Listesi
+            {school?.name || 'Kurum'} – Görevli Öğretmen ve Personel Listesi
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Okulunuzda ders ücreti karşılığında görevlendirilen ücretli öğretmen ve usta öğreticilerin listesi.

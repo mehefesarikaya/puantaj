@@ -74,7 +74,8 @@ export const MonthlyReviewView: React.FC = () => {
   });
 
   const handleApprove = () => {
-    if (confirm(`${currentSchool.name} okulunun ${monthName} ${selectedYear} puantajını ONAYLAMAK istediğinizden emin misiniz?`)) {
+    const targetName = currentSchool?.name || 'Seçili okul';
+    if (confirm(`${targetName} okulunun ${monthName} ${selectedYear} puantajını ONAYLAMAK istediğinizden emin misiniz?`)) {
       updateSubmissionStatus(effectiveSchoolId, selectedYear, selectedMonth, 'onaylandi', 'İlçe MEM tarafından onaylandı.');
     }
   };

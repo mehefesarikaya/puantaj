@@ -17,6 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { School } from '../../types';
 import {
   MONTH_NAMES_TR,
   getDaysInMonth,
@@ -81,13 +82,29 @@ export const SchoolPuantajEntryView: React.FC = () => {
   const period = getTimesheetPeriod(selectedYear, selectedMonth);
   const isPeriodClosed = period.status === 'kapali';
 
+  // Safe fallback school
+  const fallbackSchool: School = {
+    id: currentUser?.schoolId || 'default-school',
+    institutionCode: currentUser?.username || '000000',
+    name: currentUser?.fullName ? currentUser.fullName.replace(' Yetkilisi', '') : 'Kurum',
+    province: 'Ankara',
+    district: 'İlçe / İl',
+    schoolType: 'Okul',
+    principalName: '',
+    contactPhone: '',
+    contactEmail: '',
+    generalDirectorate: 'Temel Eğitim Genel Müdürlüğü',
+    accountActive: true,
+    isActive: true,
+  };
+
   // School belonging to this user
-  const school = schools.find((s) => s.id === currentUser?.schoolId) || schools[0];
+  const school = (currentUser?.schoolId ? schools.find((s) => s.id === currentUser.schoolId) : null) || schools[0] || fallbackSchool;
   const schoolTeachers = teachers; // strictly scoped
 
   // Submission status
   const sub = submissions.find(
-    (s) => s.schoolId === school.id && s.year === selectedYear && s.month === selectedMonth
+    (s) => s.schoolId === school?.id && s.year === selectedYear && s.month === selectedMonth
   );
 
   const status = sub?.status || 'taslak';
@@ -286,7 +303,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
       dailyHours: r.daily,
       totalHours: r.total,
     }));
-    exportMonthlyPuantajToExcel(school.name, selectedYear, selectedMonth, exportData);
+    exportMonthlyPuantajToExcel(school?.name || 'Kurum', selectedYear, selectedMonth, exportData);
   };
 
   return (
@@ -296,7 +313,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
             <TableProperties className="w-4 h-4" />
-            <span>{school.name} – {monthName.toUpperCase()} {selectedYear}</span>
+            <span>{school?.name || 'Kurum'} – {monthName.toUpperCase()} {selectedYear}</span>
           </div>
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
             Aylık Ders Saatleri Puantaj Raporu
@@ -447,7 +464,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
                   colSpan={2 + daysInMonth + 7}
                   className="py-2.5 px-4 text-center font-bold text-xs uppercase tracking-wider bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700"
                 >
-                  {school.name.toUpperCase()} - {monthName.toUpperCase()} {selectedYear} DÖNEMİ DERS SAATLERİ PUANTAJI
+                  {school?.name ? school.name.toUpperCase() : 'KURUM'} - {monthName.toUpperCase()} {selectedYear} DÖNEMİ DERS SAATLERİ PUANTAJI
                 </th>
               </tr>
 

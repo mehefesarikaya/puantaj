@@ -14,6 +14,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { School } from '../../types';
 import { MONTH_NAMES_TR } from '../../utils/excelPuantajUtils';
 import { formatTRY } from '../../utils/paymentCalculator';
 import { calculateMonthlyPuantajTotals } from '../../utils/additionalTeachingCalculator';
@@ -38,13 +39,29 @@ export const SchoolDashboardView: React.FC = () => {
   const monthName = MONTH_NAMES_TR[selectedMonth] || '';
   const currentPeriod = getTimesheetPeriod(selectedYear, selectedMonth);
 
-  // Get active school of this logged in school user
-  const school = schools.find((s) => s.id === currentUser?.schoolId) || schools[0];
+  // Safe fallback school if schools list is empty or school record not found
+  const fallbackSchool: School = {
+    id: currentUser?.schoolId || 'default-school',
+    institutionCode: currentUser?.username || '000000',
+    name: currentUser?.fullName ? currentUser.fullName.replace(' Yetkilisi', '') : 'Kurum',
+    province: 'Ankara',
+    district: 'İlçe / İl',
+    schoolType: 'Okul',
+    principalName: '',
+    contactPhone: '',
+    contactEmail: '',
+    generalDirectorate: 'Temel Eğitim Genel Müdürlüğü',
+    accountActive: true,
+    isActive: true,
+  };
+
+  // Get active school of this logged in school user safely
+  const school = (currentUser?.schoolId ? schools.find((s) => s.id === currentUser.schoolId) : null) || schools[0] || fallbackSchool;
   const schoolTeachers = teachers; // already scoped by schoolId in context
 
   // Puantaj for this school and period
   const schoolPuantaj = puantajRows.filter(
-    (p) => p.schoolId === school.id && p.year === selectedYear && p.month === selectedMonth
+    (p) => p.schoolId === school?.id && p.year === selectedYear && p.month === selectedMonth
   );
 
   const totalTeachingHours = schoolPuantaj.reduce((acc, p) => acc + (p.totalHours || 0), 0);
@@ -54,7 +71,7 @@ export const SchoolDashboardView: React.FC = () => {
 
   // Submission status for this month
   const sub = submissions.find(
-    (s) => s.schoolId === school.id && s.year === selectedYear && s.month === selectedMonth
+    (s) => s.schoolId === school?.id && s.year === selectedYear && s.month === selectedMonth
   );
 
   const status = sub?.status || 'taslak';
@@ -62,7 +79,7 @@ export const SchoolDashboardView: React.FC = () => {
 
   const handleSubmitPuantaj = () => {
     if (confirm(`${monthName} ${selectedYear} puantaj cetvelini İlçe Milli Eğitim Müdürlüğü onayına göndermek istediğinizden emin misiniz?`)) {
-      submitPuantajToAdmin(school.id, selectedYear, selectedMonth, 'Okul personeli tarafından teslim edildi.');
+      submitPuantajToAdmin(school?.id || '', selectedYear, selectedMonth, 'Okul personeli tarafından teslim edildi.');
     }
   };
 
@@ -77,9 +94,9 @@ export const SchoolDashboardView: React.FC = () => {
               <span>•</span>
               <span>{monthName} {selectedYear} Dönemi</span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight">{school.name}</h2>
+            <h2 className="text-2xl font-bold tracking-tight">{school?.name || 'Kurum'}</h2>
             <p className="text-blue-100 text-xs mt-1">
-              Kurum Kodu: <strong>{school.institutionCode}</strong> • Okul Müdürü: {school.principalName || '-'} • {school.district}
+              Kurum Kodu: <strong>{school?.institutionCode || '-'}</strong> • Okul Müdürü: {school?.principalName || '-'} • {school?.district || '-'}
             </p>
           </div>
 
@@ -213,7 +230,7 @@ export const SchoolDashboardView: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700 mb-4">
           <div>
             <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              {school.name} – Görevli Öğretmen ve Personel Durumu
+              {school?.name || 'Kurum'} – Görevli Öğretmen ve Personel Durumu
             </h3>
             <p className="text-xs text-slate-500">
               {monthName} {selectedYear} dönemi için kayıtlı {schoolTeachers.length} personelin ders icmali.

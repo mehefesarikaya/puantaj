@@ -367,14 +367,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         remoteBranches,
       ] = await Promise.race([fetchAllPromise, timeoutPromise]);
 
-      if (remoteSchools) setSchools(remoteSchools);
-      if (remoteTeachers) setAllTeachers(remoteTeachers);
-      if (remoteSubmissions) setSubmissions(remoteSubmissions);
+      if (remoteSchools && remoteSchools.length > 0) setSchools(remoteSchools);
+      if (remoteTeachers && remoteTeachers.length > 0) setAllTeachers(remoteTeachers);
+      if (remoteSubmissions && remoteSubmissions.length > 0) setSubmissions(remoteSubmissions);
       if (remoteRules) setRules(remoteRules);
       if (remotePeriods && remotePeriods.length > 0) setTimesheetPeriods(remotePeriods);
-      if (remoteSchedules) setWeeklySchedules(remoteSchedules);
+      if (remoteSchedules && remoteSchedules.length > 0) setWeeklySchedules(remoteSchedules);
       if (remoteLogs && remoteLogs.length > 0) setAuditLogs(remoteLogs);
-      if (remotePuantaj) setPuantajRows(remotePuantaj);
+      if (remotePuantaj && remotePuantaj.length > 0) setPuantajRows(remotePuantaj);
       if (remoteBranches && remoteBranches.length > 0) setBranches(remoteBranches);
       setBackendMode('supabase');
     } catch (err) {

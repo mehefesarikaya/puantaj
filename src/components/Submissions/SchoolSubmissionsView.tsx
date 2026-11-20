@@ -107,14 +107,17 @@ export const SchoolSubmissionsView: React.FC = () => {
   const filteredData = useMemo(() => {
     return schoolSubmissionsData.filter((item) => {
       // Search filter
+      const schoolName = item.school?.name || '';
+      const instCode = item.school?.institutionCode || '';
+      const district = item.school?.district || '';
       const matchesSearch =
-        item.school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.school.institutionCode.includes(searchQuery) ||
-        (item.school.district && item.school.district.toLowerCase().includes(searchQuery.toLowerCase()));
+        schoolName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        instCode.includes(searchQuery) ||
+        district.toLowerCase().includes(searchQuery.toLowerCase());
 
       // Directorate filter
       const matchesDirectorate =
-        selectedDirectorateFilter === 'all' || item.school.generalDirectorate === selectedDirectorateFilter;
+        selectedDirectorateFilter === 'all' || item.school?.generalDirectorate === selectedDirectorateFilter;
 
       // Status filter
       let matchesStatus = true;
@@ -372,10 +375,10 @@ export const SchoolSubmissionsView: React.FC = () => {
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 dark:text-white truncate">
-                              {item.school.name}
+                              {item.school?.name || 'Kurum Adı'}
                             </div>
                             <div className="text-[10px] text-slate-400 font-mono">
-                              Kod: {item.school.institutionCode} • {item.school.district}
+                              Kod: {item.school?.institutionCode || '-'} • {item.school?.district || '-'}
                             </div>
                           </div>
                         </div>
@@ -459,7 +462,7 @@ export const SchoolSubmissionsView: React.FC = () => {
                           {!isApproved && (
                             <button
                               type="button"
-                              onClick={() => handleApprove(item.school.id, item.school.name)}
+                              onClick={() => handleApprove(item.school?.id || '', item.school?.name || 'Kurum')}
                               className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all"
                               title="Puantajı Onayla"
                             >
@@ -502,7 +505,7 @@ export const SchoolSubmissionsView: React.FC = () => {
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     Puantaj Düzeltme Talebi
                   </h3>
-                  <p className="text-[11px] text-slate-500">{correctionTargetSchool.name}</p>
+                  <p className="text-[11px] text-slate-500">{correctionTargetSchool?.name || ''}</p>
                 </div>
               </div>
               <button

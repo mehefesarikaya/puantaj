@@ -84,15 +84,18 @@ export const SchoolListView: React.FC = () => {
   const passiveSchoolsCount = schools.filter((s) => s.accountActive === false || s.isActive === false).length;
 
   const filteredSchools = schools.filter((s) => {
+    const sName = s?.name || '';
+    const sCode = s?.institutionCode || '';
+    const sDist = s?.district || '';
     const matchesSearch =
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.institutionCode.includes(searchQuery) ||
-      s.district.toLowerCase().includes(searchQuery.toLowerCase());
+      sName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sCode.includes(searchQuery) ||
+      sDist.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesDirectorate =
-      selectedDirectorate === 'all' || s.generalDirectorate === selectedDirectorate;
+      selectedDirectorate === 'all' || s?.generalDirectorate === selectedDirectorate;
 
-    const isAccountActive = s.accountActive !== false && s.isActive !== false;
+    const isAccountActive = s?.accountActive !== false && s?.isActive !== false;
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'active' && isAccountActive) ||
@@ -107,7 +110,7 @@ export const SchoolListView: React.FC = () => {
   };
 
   const handleDelete = (school: School) => {
-    if (confirm(`"${school.name}" (${school.institutionCode}) kurumunu ve bağlı tüm puantaj kayıtlarını silmek istediğinizden emin misiniz?`)) {
+    if (confirm(`"${school?.name || ''}" (${school?.institutionCode || ''}) kurumunu ve bağlı tüm puantaj kayıtlarını silmek istediğinizden emin misiniz?`)) {
       deleteSchool(school.id);
     }
   };
@@ -609,7 +612,7 @@ export const SchoolListView: React.FC = () => {
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                   Şifre Sıfırla
                 </h3>
-                <p className="text-[11px] text-slate-500">{resetSchoolTarget.name}</p>
+                <p className="text-[11px] text-slate-500">{resetSchoolTarget?.name || ''}</p>
               </div>
             </div>
 
@@ -675,7 +678,7 @@ export const SchoolListView: React.FC = () => {
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     Kurum Giriş Bilgileri
                   </h3>
-                  <p className="text-[11px] text-slate-500">{credentialsTarget.school.name}</p>
+                  <p className="text-[11px] text-slate-500">{credentialsTarget?.school?.name || ''}</p>
                 </div>
               </div>
               <button
@@ -730,7 +733,7 @@ export const SchoolListView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const summary = `Kurum Adı: ${credentialsTarget.school.name}\nKurum Kodu (Kullanıcı Adı): ${credentialsTarget.school.institutionCode}\nŞifre: ${credentialsTarget.password || 'Mevcut Şifre'}\nGenel Müdürlük: ${credentialsTarget.school.generalDirectorate || ''}`;
+                  const summary = `Kurum Adı: ${credentialsTarget?.school?.name || ''}\nKurum Kodu (Kullanıcı Adı): ${credentialsTarget?.school?.institutionCode || ''}\nŞifre: ${credentialsTarget?.password || 'Mevcut Şifre'}\nGenel Müdürlük: ${credentialsTarget?.school?.generalDirectorate || ''}`;
                   handleCopyCredentials(summary);
                 }}
                 className="flex items-center space-x-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition-colors"
@@ -762,7 +765,7 @@ export const SchoolListView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {detailSchoolTarget.name}
+                    {detailSchoolTarget?.name || ''}
                   </h3>
                   <p className="text-[11px] text-slate-500 font-mono">
                     Kurum Kodu: {detailSchoolTarget.institutionCode}
@@ -841,7 +844,7 @@ export const SchoolListView: React.FC = () => {
             <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Puantaj Teslim Geçmişi: {historySchoolTarget.name}
+                  Puantaj Teslim Geçmişi: {historySchoolTarget?.name || ''}
                 </h3>
                 <p className="text-xs text-slate-500">Kurum Kodu: {historySchoolTarget.institutionCode}</p>
               </div>

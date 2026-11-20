@@ -280,7 +280,7 @@ export const AdminTeacherFormModal: React.FC<AdminTeacherFormModalProps> = ({
                   <option value="">Okul Seçin</option>
                   {schools.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.institutionCode})
+                      {s?.name || ''} ({s?.institutionCode || ''})
                     </option>
                   ))}
                 </select>

@@ -9,6 +9,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { School } from '../../types';
 import { MONTH_NAMES_TR } from '../../utils/excelPuantajUtils';
 import { formatTRY } from '../../utils/paymentCalculator';
 
@@ -23,10 +24,26 @@ export const SchoolHistoryView: React.FC = () => {
     setActiveTab,
   } = useApp();
 
-  const school = schools.find((s) => s.id === currentUser?.schoolId) || schools[0];
+  // Safe fallback school
+  const fallbackSchool: School = {
+    id: currentUser?.schoolId || 'default-school',
+    institutionCode: currentUser?.username || '000000',
+    name: currentUser?.fullName ? currentUser.fullName.replace(' Yetkilisi', '') : 'Kurum',
+    province: 'Ankara',
+    district: 'İlçe / İl',
+    schoolType: 'Okul',
+    principalName: '',
+    contactPhone: '',
+    contactEmail: '',
+    generalDirectorate: 'Temel Eğitim Genel Müdürlüğü',
+    accountActive: true,
+    isActive: true,
+  };
+
+  const school = (currentUser?.schoolId ? schools.find((s) => s.id === currentUser.schoolId) : null) || schools[0] || fallbackSchool;
 
   const schoolSubmissions = submissions
-    .filter((s) => s.schoolId === school.id)
+    .filter((s) => s.schoolId === school?.id)
     .sort((a, b) => b.year - a.year || b.month - a.month);
 
   const handleOpenMonth = (year: number, month: number) => {
@@ -42,7 +59,7 @@ export const SchoolHistoryView: React.FC = () => {
           Geçmiş Dönem Puantaj ve Onay Geçmişi
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          {school.name} kurumuna ait geçmiş ayların teslim ve ilçe onay geçmişi.
+          {school?.name || 'Kurum'} kurumuna ait geçmiş ayların teslim ve ilçe onay geçmişi.
         </p>
       </div>
 
