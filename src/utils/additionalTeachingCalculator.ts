@@ -107,6 +107,29 @@ export function calculatePersonnelBonusHours(
 }
 
 /**
+ * Personelin statüsüne göre haftalık Hazırlık ve Planlama ek ders saatini hesaplar.
+ * - SADECE Sözleşmeli Personel: MEB Madde 11 uyarınca her 10 saate 1 saat (haftada en fazla 3 saat).
+ * - Ücretli Öğretmenler: 2+1 sistemi (Haftalık planlanan her 2 saate 1 saat ilave ek ders).
+ * - Diğer Personeller: 0 saat.
+ */
+export function calculatePreparationPlanningHours(
+  teacher: Teacher | { employmentType?: string } | null | undefined,
+  scheduledHours: number
+): number {
+  if (scheduledHours <= 0) return 0;
+  // SADECE sözleşmeli personelde 10 saate 1 saat hazırlık ve planlama verilir (en fazla 3 saat)
+  if (isSozlesmeli(teacher)) {
+    return Math.min(3, Math.floor(scheduledHours / 10));
+  }
+  // Ücretli öğretmenlerde 2+1 sistemi uygulanır
+  if (isUcretli(teacher)) {
+    return Math.floor(scheduledHours / 2);
+  }
+  // Diğer tüm personel türlerinde hazırlık saati 0'dır
+  return 0;
+}
+
+/**
  * Bir öğretmenin haftalık ders programı ve görevlerine göre haftalık ek ders saatini hesaplar.
  */
 export function calculateWeeklyAdditionalTeaching(
@@ -143,10 +166,11 @@ export function calculateWeeklyAdditionalTeaching(
   // 3. Planlanan temel ders saati (Maaş karşılığı düşüldükten sonra kalan maaş üstü ek ders)
   const excessLessonHours = Math.max(0, weeklyScheduledHours - maasKarsiligiHours);
 
-  // 4. Hazırlık ve Planlama / İlave Ek Ders:
-  // - Yalnızca Ücretli öğretmenler: 2+1 sistemi (Haftalık planlanan her 2 saate 1 saat)
-  // - Sözleşmeli ve diğer tüm personel türleri: Normal hesaplama (ilave uygulanmaz -> 0 saat)
-  const preparationPlanningHours = calculatePersonnelBonusHours(teacher, weeklyScheduledHours);
+  // 4. Hazırlık ve Planlama:
+  // - SADECE Sözleşmeli personelde 10 saate 1 saat hazırlık ve planlama verilir (en fazla 3 saat)
+  // - Ücretli öğretmenlerde 2+1 sistemi (haftalık planlanan her 2 saat derse 1 saat ilave)
+  // - Diğer tüm personel türlerinde 0 saat
+  const preparationPlanningHours = calculatePreparationPlanningHours(teacher, weeklyScheduledHours);
 
   // 5. Nöbet Görevi (Haftada 3 saat)
   const guardDutyHours = teacher.hasGuardDuty ? rules.nobetHoursPerWeek || 3 : 0;

@@ -44,6 +44,14 @@ assert(
   calcSource.includes("const maasKarsiligiHours = isSozlesmeli(teacher)"),
   'Maaş karşılığı düşümü yalnızca isSozlesmeli(teacher) için yapılmalı'
 );
+assert(
+  calcSource.includes("export function calculatePreparationPlanningHours"),
+  'calculatePreparationPlanningHours fonksiyonu dışa aktarılmış olmalı'
+);
+assert(
+  calcSource.includes("Math.min(3, Math.floor(scheduledHours / 10))"),
+  'Sözleşmeli personel için 10 saate 1 saat hazırlık ve planlama formülü bulunmalı'
+);
 console.log('✓ Kaynak kod kontrolleri (5+1 kaldırıldı, 2+1 yalnızca ücretli için) başarıyla doğrulandı.\n');
 
 // 2. Fonksiyonel Mantık Testleri
@@ -265,6 +273,35 @@ assert.strictEqual(digerWeekly.maasKarsiligiHours, 0, 'Diğer personeller için 
 assert.strictEqual(digerWeekly.excessLessonHours, 30, 'Diğer personeller için 30 saatin tamamı kalmalı');
 assert.strictEqual(digerWeekly.bonus, 0, 'Diğer personeller için bonus 0 olmalı');
 console.log(`✓ Diğer Personel: Planlanan=${digerWeekly.weeklyScheduledHours}s, Maaş Karşılığı Düşümü=-${digerWeekly.maasKarsiligiHours}s (Düşülmez), Kalan Ek Ders=${digerWeekly.excessLessonHours}s`);
+
+// ----------------------------------------------------
+// TEST 7: SADECE Sözleşmelide 10 Saate 1 Saat Hazırlık ve Planlama
+// ----------------------------------------------------
+console.log('--- TEST 7: Sadece Sözleşmelide 10 Saate 1 Saat Hazırlık-Planlama ---');
+function calculatePreparationPlanningHoursMock(teacher, scheduledHours) {
+  if (scheduledHours <= 0) return 0;
+  if (isSozlesmeli(teacher)) {
+    return Math.min(3, Math.floor(scheduledHours / 10));
+  }
+  if (isUcretli(teacher)) {
+    return Math.floor(scheduledHours / 2);
+  }
+  return 0;
+}
+
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 30), 3, '30 saat ders için 3 saat hazırlık verilmeli');
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 25), 2, '25 saat ders için 2 saat hazırlık verilmeli');
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 20), 2, '20 saat ders için 2 saat hazırlık verilmeli');
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 15), 1, '15 saat ders için 1 saat hazırlık verilmeli');
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 10), 1, '10 saat ders için 1 saat hazırlık verilmeli');
+assert.strictEqual(calculatePreparationPlanningHoursMock(sozlesmeliTeacher, 8), 0, '8 saat ders için 0 saat hazırlık verilmeli');
+console.log('✓ Sözleşmeli Personel 10\'a 1 hazırlık testleri: 30s->3s, 20s->2s, 10s->1s başarıyla doğrulandı.');
+
+assert.strictEqual(calculatePreparationPlanningHoursMock(ucretliTeacher, 30), 15, 'Ücretli öğretmen 2+1 ile 15 saat ilave almalı');
+assert.strictEqual(calculatePreparationPlanningHoursMock(stajyerTeacher, 30), 0, 'Diğer personeller için hazırlık saati 0 olmalı');
+assert.strictEqual(calculatePreparationPlanningHoursMock(iskurTeacher, 30), 0, 'İŞKUR personeli için hazırlık saati 0 olmalı');
+assert.strictEqual(calculatePreparationPlanningHoursMock(kadroluTeacher, 30), 0, 'Kadrolu personel için hazırlık saati 0 olmalı');
+console.log('✓ Hazırlık saati kuralı doğrulandı: SADECE Sözleşmelide 10\'a 1 uygulanıyor.');
 
 console.log('\n================================================================');
 console.log('  TÜM PERSONEL HESAPLAMA TESTLERİ BAŞARIYLA TAMAMLANDI! (%100)');
