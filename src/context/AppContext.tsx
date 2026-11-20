@@ -27,6 +27,8 @@ import {
   getDefaultPeriodForMonth,
   loadStoredData,
   saveStoredData,
+  loadSessionData,
+  saveSessionData,
   STORAGE_KEYS,
 } from '../utils/adminStorage';
 import { INITIAL_ACCOUNTS, hashPassword } from '../utils/authUtils';
@@ -244,15 +246,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadStoredData(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS)
   );
 
+  // Her yeni cihazda ve tarayıcı açılışında doğrudan giriş ekranına yönlendirilir (otomatik oturum açılmaz)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    // If Supabase backend is configured, we must verify authentication through Supabase Auth
-    // rather than assuming the local admin account is active.
-    if (isSupabaseActive) {
-      return null;
-    }
-    return loadStoredData(STORAGE_KEYS.SESSION, INITIAL_ACCOUNTS[0]);
+    return loadSessionData();
   });
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(isSupabaseActive);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
+    return isSupabaseActive && !!loadSessionData();
+  });
 
   const [weeklySchedules, setWeeklySchedules] = useState<TeacherWeeklySchedule[]>(() =>
     loadStoredData(STORAGE_KEYS.WEEKLY_SCHEDULES, generateInitialWeeklySchedules())
@@ -293,7 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => saveStoredData(STORAGE_KEYS.RULES, rules), [rules]);
   useEffect(() => saveStoredData(STORAGE_KEYS.LOGS, auditLogs), [auditLogs]);
   useEffect(() => saveStoredData(STORAGE_KEYS.ACCOUNTS, accounts), [accounts]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.SESSION, currentUser), [currentUser]);
+  useEffect(() => saveSessionData(currentUser), [currentUser]);
   useEffect(() => saveStoredData(STORAGE_KEYS.WEEKLY_SCHEDULES, weeklySchedules), [weeklySchedules]);
   useEffect(() => saveStoredData(STORAGE_KEYS.TIMESHEET_PERIODS, timesheetPeriods), [timesheetPeriods]);
   useEffect(() => saveStoredData(STORAGE_KEYS.DIRECTORATE, selectedDirectorate), [selectedDirectorate]);
@@ -392,6 +392,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const initAuthSession = async () => {
       try {
+        const existingSession = loadSessionData();
+        if (!existingSession) {
+          setCurrentUser(null);
+          setIsAuthChecking(false);
+          return;
+        }
+
         const sessionUser = await supabaseAuthService.getActiveSessionUser();
         if (sessionUser && sessionUser.isActive) {
           setCurrentUser(sessionUser);
@@ -401,10 +408,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await syncFromRemote();
         } else {
           setCurrentUser(null);
+          saveSessionData(null);
         }
       } catch (err) {
         console.warn('Oturum doğrulama hatası:', err);
         setCurrentUser(null);
+        saveSessionData(null);
       } finally {
         setIsAuthChecking(false);
       }
@@ -504,6 +513,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     logAction('Çıkış Yapıldı', `${currentUser?.fullName} oturumu kapattı.`);
     setCurrentUser(null);
+    saveSessionData(null);
   };
 
   const switchAccount = (userId: string) => {
@@ -1722,7 +1732,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSubmissions(INITIAL_SUBMISSIONS);
     setRules(DEFAULT_MEB_PAYMENT_RULES);
     setAccounts(INITIAL_ACCOUNTS);
-    setCurrentUser(INITIAL_ACCOUNTS[0]);
+    setCurrentUser(null);
+    saveSessionData(null);
     logAction('Sistem Sıfırlandı', 'Orijinal test verileriyle sistem sıfırlandı.');
   };
 

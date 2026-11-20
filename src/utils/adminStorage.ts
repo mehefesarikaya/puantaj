@@ -506,4 +506,32 @@ export function saveStoredData<T>(key: string, data: T): void {
   }
 }
 
+export function loadSessionData(): any | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const item = sessionStorage.getItem(STORAGE_KEYS.SESSION);
+    return item ? JSON.parse(item) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSessionData(data: any | null): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      if (data) {
+        sessionStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(data));
+      } else {
+        sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+      }
+    }
+    // Eski veya kalıcı localStorage oturumunu temizle (güvenlik için)
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.SESSION);
+    }
+  } catch (err) {
+    console.error('Session kaydetme hatası:', err);
+  }
+}
+
 export { STORAGE_KEYS };
