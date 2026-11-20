@@ -396,7 +396,7 @@ export const AdminDashboardView: React.FC = () => {
           <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">
             {totalPayableHours} <span className="text-xs font-normal text-slate-400">saat</span>
           </h3>
-          <p className="text-[11px] text-indigo-600 mt-1 font-medium">5'e 1 hazırlık dahil</p>
+          <p className="text-[11px] text-indigo-600 mt-1 font-medium">İlave ek dersler dahil</p>
         </div>
 
         {/* Estimated Total Payment */}

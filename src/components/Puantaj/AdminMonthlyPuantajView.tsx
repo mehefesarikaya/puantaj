@@ -505,7 +505,7 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                   TOPLAM SAAT
                 </th>
                 <th className="py-2.5 px-2 text-center font-bold border-r border-slate-300 dark:border-slate-700 bg-blue-100/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-300 min-w-[45px]">
-                  5'e 1
+                  İlave (5+1 / 2+1)
                 </th>
                 <th className="py-2.5 px-2 text-center font-bold border-r border-slate-300 dark:border-slate-700 bg-indigo-100/60 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-300 min-w-[55px]">
                   ÖDENECEK
@@ -760,7 +760,7 @@ export const AdminMonthlyPuantajView: React.FC = () => {
                         <td className="py-1.5 px-2 text-center font-mono font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100/30 border-r border-slate-200 dark:border-slate-700">
                           {dutyTotal}
                         </td>
-                        <td className="py-1.5 px-2 text-center font-mono text-slate-400 bg-slate-50/50 border-r border-slate-200 dark:border-slate-700 text-[11px]" title="Nöbet saatlerine 5'e 1 hazırlık uygulanmaz">
+                        <td className="py-1.5 px-2 text-center font-mono text-slate-400 bg-slate-50/50 border-r border-slate-200 dark:border-slate-700 text-[11px]" title="Nöbet saatlerine ek ders ilavesi uygulanmaz">
                           —
                         </td>
                         <td className="py-1.5 px-2 text-center font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/40 border-r border-slate-200 dark:border-slate-700">

@@ -320,7 +320,7 @@ export const MonthlyReviewView: React.FC = () => {
                   <span className="font-bold text-slate-800 dark:text-slate-200">{breakdown.totalActualHours} saat</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block">5'e 1 İlave</span>
+                  <span className="text-[10px] text-slate-400 block">İlave Ek Ders</span>
                   <span className="font-bold text-blue-600">+{breakdown.bonusHours} saat</span>
                 </div>
                 <div>

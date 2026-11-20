@@ -978,7 +978,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           daysInMonth,
           weeklyScheduleHours: schedule?.totalWeeklyHours,
           rules,
-          isAlreadyEkDers: true,
         });
 
         updatedRow = {
@@ -1004,7 +1003,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           daysInMonth,
           weeklyScheduleHours: schedule?.totalWeeklyHours,
           rules,
-          isAlreadyEkDers: true,
         });
 
         updatedRow = {

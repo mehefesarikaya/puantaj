@@ -205,7 +205,7 @@ export const SchoolDashboardView: React.FC = () => {
           <h3 className="text-2xl font-extrabold text-blue-600">
             {totalPayableHours} <span className="text-xs font-normal text-slate-400">saat</span>
           </h3>
-          <p className="text-[11px] text-blue-500 mt-1">+{totalBonusHours} saat 5'e 1 ilavesi dahil</p>
+          <p className="text-[11px] text-blue-500 mt-1">+{totalBonusHours} saat ek ders ilavesi dahil</p>
         </div>
 
         {/* Total Net Payment */}
@@ -253,7 +253,7 @@ export const SchoolDashboardView: React.FC = () => {
                 <th className="py-2.5 px-3">Adı Soyadı</th>
                 <th className="py-2.5 px-3">Açıklama / Branş</th>
                 <th className="py-2.5 px-3 text-center">Fiili Saat</th>
-                <th className="py-2.5 px-3 text-center">5'e 1 İlave</th>
+                <th className="py-2.5 px-3 text-center">İlave Ek Ders</th>
                 <th className="py-2.5 px-3 text-center">Ödenecek Saat</th>
                 <th className="py-2.5 px-3 text-right">Tahakkuk Tutar</th>
               </tr>
