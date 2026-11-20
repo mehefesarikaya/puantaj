@@ -498,7 +498,7 @@ export const SchoolPuantajEntryView: React.FC = () => {
                   TOPLAM SAAT
                 </th>
                 <th className="py-2.5 px-2 text-center font-bold border-r border-slate-300 dark:border-slate-700 bg-blue-100/60 text-blue-900 min-w-[45px]">
-                  İlave (5+1 / 2+1)
+                  İlave (2+1)
                 </th>
                 <th className="py-2.5 px-2 text-center font-bold border-r border-slate-300 dark:border-slate-700 bg-indigo-100/60 text-indigo-900 min-w-[55px]">
                   ÖDENECEK

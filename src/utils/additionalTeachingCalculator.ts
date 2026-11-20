@@ -88,22 +88,21 @@ export function isUcretli(
 }
 
 /**
- * Personel türüne göre ilave ek ders saatini (bonus) hesaplar:
- * 1. Sözleşmeli personel: 5+1 sistemi (5 saat çalışma karşılığında 1 saat ek ders)
- * 2. Ücretli öğretmenler: 2+1 sistemi (2 saat çalışma karşılığında 1 saat ek ders)
- * 3. Diğer personel türleri: Normal sistem (5+1 veya 2+1 uygulanmaz -> 0)
+ * Personel türüne göre ilave ek ders saatini (2+1 sistemi) hesaplar:
+ * 1. Yalnızca Ücretli öğretmenler: 2+1 sistemi (Her 2 saatlik çalışma karşılığında 1 saat ek ders)
+ * 2. Sözleşmeli personel: Normal hesaplama (5+1 sistemi kesinlikle uygulanmaz -> 0)
+ * 3. Diğer bütün personel türleri: Normal hesaplama (2+1 veya 5+1 uygulanmaz -> 0)
  */
 export function calculatePersonnelBonusHours(
   teacher: Teacher | { employmentType?: string } | null | undefined,
   hours: number
 ): number {
   if (hours <= 0) return 0;
-  if (isSozlesmeli(teacher)) {
-    return Math.floor(hours / 5);
-  }
+  // Yalnızca personel türü "Ücretli" olan öğretmenlerde 2+1 sistemi uygulanır
   if (isUcretli(teacher)) {
     return Math.floor(hours / 2);
   }
+  // Sözleşmeli personel ve diğer tüm personel türleri normal hesaplanır (ilave ek ders uygulanmaz)
   return 0;
 }
 
@@ -140,9 +139,8 @@ export function calculateWeeklyAdditionalTeaching(
   const excessLessonHours = weeklyScheduledHours;
 
   // 4. Hazırlık ve Planlama / İlave Ek Ders:
-  // - Sözleşmeli personel: 5+1 sistemi (Haftalık planlanan her 5 saate 1 saat)
-  // - Ücretli öğretmenler: 2+1 sistemi (Haftalık planlanan her 2 saate 1 saat)
-  // - Diğer personel türleri: 5+1 veya 2+1 uygulanmaz (0 saat)
+  // - Yalnızca Ücretli öğretmenler: 2+1 sistemi (Haftalık planlanan her 2 saate 1 saat)
+  // - Sözleşmeli ve diğer tüm personel türleri: Normal hesaplama (ilave uygulanmaz -> 0 saat)
   const preparationPlanningHours = calculatePersonnelBonusHours(teacher, weeklyScheduledHours);
 
   // 5. Nöbet Görevi (Haftada 3 saat)
@@ -395,18 +393,18 @@ export interface MonthlyPuantajTotals {
  * Aylık puantaj cetveli için toplam saat, ek ders ilavesi ve ödenecek toplam saati hesaplar.
  *
  * HESAPLAMA KURALLARI:
- * 1. Sözleşmeli personel:
- *    - 5+1 sistemine göre hesaplanır (5 saat çalışma karşılığında 1 saat ek ders).
- *    - İlave Ek Ders = Math.floor(totalHours / 5)
- *    - Ödenecek Saat = totalHours + İlave Ek Ders
- *
- * 2. Ücretli öğretmenler:
- *    - 2+1 sistemine göre hesaplanır (2 saat çalışma karşılığında 1 saat ek ders).
+ * 1. Ücretli öğretmenler:
+ *    - Yalnızca ücretli öğretmenlere 2+1 sistemi uygulanır (Her 2 saatlik çalışma karşılığında 1 saat ek ders).
  *    - İlave Ek Ders = Math.floor(totalHours / 2)
  *    - Ödenecek Saat = totalHours + İlave Ek Ders
  *
- * 3. Diğer personel türleri (stajyer, İŞKUR, kadrolu vb.):
- *    - Normal ek ders hesaplama sistemi uygulanır. 5+1 veya 2+1 uygulanmaz.
+ * 2. Sözleşmeli personel:
+ *    - Normal ek ders hesaplama kurallarına göre hesaplanır. 5+1 sistemi kesinlikle uygulanmaz.
+ *    - İlave Ek Ders = 0
+ *    - Ödenecek Saat = totalHours
+ *
+ * 3. Diğer bütün personel türleri (stajyer, İŞKUR, kadrolu vb.):
+ *    - Normal ek ders hesaplama sistemi uygulanır. 2+1 veya 5+1 uygulanmaz.
  *    - İlave Ek Ders = 0
  *    - Ödenecek Saat = totalHours
  */
@@ -423,9 +421,8 @@ export function calculateMonthlyPuantajTotals(params: {
     teacher.hourlyRate || rules.gunduzHourlyRate || rules.ucretliHourlyRate || 220.57;
 
   // Personel türüne göre ilave ek ders saati:
-  // - Sözleşmeli: 5+1 (Math.floor(totalHours / 5))
-  // - Ücretli: 2+1 (Math.floor(totalHours / 2))
-  // - Diğer: 0 (Normal)
+  // - Yalnızca Ücretli öğretmenler: 2+1 sistemi (Math.floor(totalHours / 2))
+  // - Sözleşmeli ve diğer tüm personel türleri: Normal hesaplama (0)
   const bonusFiveToOneHours = calculatePersonnelBonusHours(teacher, totalHours);
   const payableTotalHours = totalHours + bonusFiveToOneHours;
   const estimatedPayment = Math.round(payableTotalHours * hourlyRate * 100) / 100;

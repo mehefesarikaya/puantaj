@@ -1,10 +1,16 @@
 /**
  * Test: Kolay Ekders – Personel Türüne Göre Ek Ders Hesaplama Testleri
  *
- * Kurallar:
- * 1. Sözleşmeli personel: 5+1 sistemi (5 saat çalışma karşılığında 1 saat ek ders -> Math.floor(hours / 5))
- * 2. Ücretli öğretmenler: 2+1 sistemi (2 saat çalışma karşılığında 1 saat ek ders -> Math.floor(hours / 2))
- * 3. Diğer personel türleri (stajyer, İŞKUR, kadrolu vb.): Normal ek ders sistemi (5+1 veya 2+1 uygulanmaz -> 0)
+ * Kesin Kurallar:
+ * 1. Ücretli öğretmenler:
+ *    - Yalnızca ücretli öğretmenlere 2+1 sistemi uygulanır (Her 2 saatlik çalışma karşılığında 1 saat ek ders -> Math.floor(hours / 2))
+ *    - Bu kural yalnızca personel türü "Ücretli" olan kişilerde geçerlidir.
+ * 2. Sözleşmeli personel:
+ *    - Normal ek ders hesaplama kurallarına göre hesaplanır.
+ *    - 5+1 sistemi kesinlikle uygulanmaz (İlave ek ders = 0).
+ * 3. Diğer bütün personel türleri (stajyer, İŞKUR, kadrolu vb.):
+ *    - Normal ek ders hesaplama kurallarına göre hesaplanır.
+ *    - Hiçbir şekilde 2+1 veya 5+1 sistemi uygulanmaz (İlave ek ders = 0).
  */
 
 import assert from 'assert';
@@ -27,8 +33,8 @@ assert(
   'isUcretli fonksiyonu dışa aktarılmış olmalı'
 );
 assert(
-  calcSource.includes("Math.floor(hours / 5)"),
-  'Sözleşmeli için 5+1 formülü (Math.floor(hours / 5)) bulunmalı'
+  !calcSource.includes("Math.floor(hours / 5)"),
+  '5+1 formülü (Math.floor(hours / 5)) kod içerisinden tamamen kaldırılmış olmalı'
 );
 assert(
   calcSource.includes("Math.floor(hours / 2)"),
@@ -38,7 +44,7 @@ assert(
   !appContextSource.includes("isAlreadyEkDers: true"),
   'AppContext.tsx içinde hücre güncellemesinde isAlreadyEkDers: true engeli kaldırılmış olmalı'
 );
-console.log('✓ Kaynak kod kontrolleri (5+1 ve 2+1 formülleri, statü kontrolleri) doğrulandı.\n');
+console.log('✓ Kaynak kod kontrolleri (5+1 kaldırıldı, 2+1 yalnızca ücretli için) başarıyla doğrulandı.\n');
 
 // 2. Fonksiyonel Mantık Testleri
 function isSozlesmeli(teacher) {
@@ -52,12 +58,11 @@ function isUcretli(teacher) {
 
 function calculatePersonnelBonusHours(teacher, hours) {
   if (hours <= 0) return 0;
-  if (isSozlesmeli(teacher)) {
-    return Math.floor(hours / 5);
-  }
+  // Yalnızca ücretli öğretmenlerde 2+1 uygulanır
   if (isUcretli(teacher)) {
     return Math.floor(hours / 2);
   }
+  // Sözleşmeli ve diğer tüm personeller normal hesaplanır (bonus = 0)
   return 0;
 }
 
@@ -96,9 +101,9 @@ assert.strictEqual(isUcretli({ employmentType: 'stajyer' }), false);
 console.log('✓ Statü belirleme fonksiyonları doğru çalışıyor.\n');
 
 // ----------------------------------------------------
-// TEST 2: Sözleşmeli Personel 5+1 Sistemi
+// TEST 2: Sözleşmeli Personel Normal Hesaplama (5+1 Kesinlikle Yok)
 // ----------------------------------------------------
-console.log('--- TEST 2: Sözleşmeli Personel 5+1 Sistemi Doğrulaması ---');
+console.log('--- TEST 2: Sözleşmeli Personel Normal Hesaplama Doğrulaması ---');
 const sozlesmeliTeacher = {
   id: 't-sozlesmeli',
   fullName: 'Ahmet Sözleşmeli',
@@ -107,11 +112,10 @@ const sozlesmeliTeacher = {
   hourlyRate: 220.57,
 };
 
-assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 5), 1);
-assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 10), 2);
-assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 14), 2);
-assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 20), 4);
-assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 30), 6);
+assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 5), 0);
+assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 10), 0);
+assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 20), 0);
+assert.strictEqual(calculatePersonnelBonusHours(sozlesmeliTeacher, 30), 0);
 
 const sozlesmeliPuantaj = calculateMonthlyPuantajTotalsMock({
   teacher: sozlesmeliTeacher,
@@ -119,10 +123,10 @@ const sozlesmeliPuantaj = calculateMonthlyPuantajTotalsMock({
   rules: RULES,
 });
 assert.strictEqual(sozlesmeliPuantaj.totalHours, 30);
-assert.strictEqual(sozlesmeliPuantaj.bonusFiveToOneHours, 6, '30 saat için 5+1 ile 6 saat ilave verilmeli');
-assert.strictEqual(sozlesmeliPuantaj.payableTotalHours, 36, '30 + 6 = 36 saat ödenmeli');
-assert.strictEqual(sozlesmeliPuantaj.estimatedPayment, Math.round(36 * 220.57 * 100) / 100);
-console.log(`✓ Sözleşmeli Personel 30 saat için: Toplam=30, İlave (5+1)=+${sozlesmeliPuantaj.bonusFiveToOneHours}, Ödenecek=${sozlesmeliPuantaj.payableTotalHours} saat, Tahakkuk=${sozlesmeliPuantaj.estimatedPayment} TL\n`);
+assert.strictEqual(sozlesmeliPuantaj.bonusFiveToOneHours, 0, 'Sözleşmeli için ilave saat kesinlikle 0 olmalı');
+assert.strictEqual(sozlesmeliPuantaj.payableTotalHours, 30, 'Sözleşmeli için 30 saat girildiyse tam 30 saat ödenmeli');
+assert.strictEqual(sozlesmeliPuantaj.estimatedPayment, Math.round(30 * 220.57 * 100) / 100);
+console.log(`✓ Sözleşmeli Personel 30 saat için: Toplam=30, İlave=0 (Normal), Ödenecek=${sozlesmeliPuantaj.payableTotalHours} saat, Tahakkuk=${sozlesmeliPuantaj.estimatedPayment} TL\n`);
 
 // ----------------------------------------------------
 // TEST 3: Ücretli Öğretmen 2+1 Sistemi
@@ -194,37 +198,37 @@ const kadroluTeacher = {
 console.log();
 
 // ----------------------------------------------------
-// TEST 5: Aynı Ders Saatine Sahip 3 Farklı Personel Türünün Karşılaştırması
+// TEST 5: Aynı Ders Saatine Sahip Farklı Personel Türlerinin Karşılaştırması
 // ----------------------------------------------------
 console.log('--- TEST 5: Karşılaştırma Senaryoları (Aynı Ders Saatleri İçin) ---');
 
 function compareTypes(hours) {
-  const soz = calculateMonthlyPuantajTotalsMock({ teacher: sozlesmeliTeacher, totalHours: hours, rules: RULES });
   const ucr = calculateMonthlyPuantajTotalsMock({ teacher: ucretliTeacher, totalHours: hours, rules: RULES });
+  const soz = calculateMonthlyPuantajTotalsMock({ teacher: sozlesmeliTeacher, totalHours: hours, rules: RULES });
   const dig = calculateMonthlyPuantajTotalsMock({ teacher: stajyerTeacher, totalHours: hours, rules: RULES });
 
-  console.log(`\n[${hours} Saat Çalışma İçin Karşılaştırma Sonuçları]:`);
-  console.log(`  * Sözleşmeli (5+1) : Fiili=${hours} sa | İlave=+${soz.bonusFiveToOneHours} sa | Ödenecek=${soz.payableTotalHours} sa | Tutar=${soz.estimatedPayment} TL`);
-  console.log(`  * Ücretli    (2+1) : Fiili=${hours} sa | İlave=+${ucr.bonusFiveToOneHours} sa | Ödenecek=${ucr.payableTotalHours} sa | Tutar=${ucr.estimatedPayment} TL`);
+  console.log(`\n[${hours} Saat Çalışma İçin Karşılaştırma]:`);
+  console.log(`  * Ücretli    (2+1)   : Fiili=${hours} sa | İlave=+${ucr.bonusFiveToOneHours} sa | Ödenecek=${ucr.payableTotalHours} sa | Tutar=${ucr.estimatedPayment} TL`);
+  console.log(`  * Sözleşmeli (Normal): Fiili=${hours} sa | İlave= ${soz.bonusFiveToOneHours} sa | Ödenecek=${soz.payableTotalHours} sa | Tutar=${soz.estimatedPayment} TL`);
   console.log(`  * Diğer     (Normal): Fiili=${hours} sa | İlave= ${dig.bonusFiveToOneHours} sa | Ödenecek=${dig.payableTotalHours} sa | Tutar=${dig.estimatedPayment} TL`);
 
-  assert.strictEqual(soz.bonusFiveToOneHours, Math.floor(hours / 5));
   assert.strictEqual(ucr.bonusFiveToOneHours, Math.floor(hours / 2));
+  assert.strictEqual(soz.bonusFiveToOneHours, 0);
   assert.strictEqual(dig.bonusFiveToOneHours, 0);
 
-  assert.strictEqual(soz.payableTotalHours, hours + Math.floor(hours / 5));
   assert.strictEqual(ucr.payableTotalHours, hours + Math.floor(hours / 2));
+  assert.strictEqual(soz.payableTotalHours, hours);
   assert.strictEqual(dig.payableTotalHours, hours);
 
   assert(ucr.payableTotalHours > soz.payableTotalHours);
-  assert(soz.payableTotalHours >= dig.payableTotalHours);
+  assert.strictEqual(soz.payableTotalHours, dig.payableTotalHours);
 }
 
 compareTypes(30);
 compareTypes(20);
 compareTypes(15);
-compareTypes(11);
+compareTypes(10);
 
 console.log('\n================================================================');
-console.log('  TÜM 6 PERSONEL HESAPLAMA TESTİ BAŞARIYLA TAMAMLANDI! (%100)');
+console.log('  TÜM PERSONEL HESAPLAMA TESTLERİ BAŞARIYLA TAMAMLANDI! (%100)');
 console.log('================================================================');
